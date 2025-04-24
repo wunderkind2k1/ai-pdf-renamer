@@ -4,6 +4,9 @@
 command -v ocrmypdf >/dev/null 2>&1 || { echo "Error: ocrmypdf is not installed. Please install it first."; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "Error: curl is not installed. Please install it first."; exit 1; }
 
+# Initialize auto_rename flag
+auto_rename=false
+
 # Function to extract text from PDF using ocrmypdf sidecar
 extract_text() {
     local pdf_file="$1"
@@ -113,14 +116,31 @@ for pdf_file in *infographic*.pdf; do
         continue
     fi
 
+    # If auto_rename is set, rename automatically
+    if [ "$auto_rename" = true ]; then
+        mv "$pdf_file" "${new_name}.pdf"
+        echo "File automatically renamed to: ${new_name}.pdf"
+        continue
+    fi
+
     # Ask for confirmation
     echo "Suggested new filename: $new_name.pdf"
-    read -p "Do you want to rename the file? (y/n): " confirm
+    echo "Options:"
+    echo "  y - Rename file"
+    echo "  n - Keep original name"
+    echo "  a - Rename all remaining files automatically"
+    read -p "Choose an option (y/n/a): " confirm
 
     if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
         # Rename the file
         mv "$pdf_file" "${new_name}.pdf"
         echo "File renamed successfully."
+    elif [[ $confirm == [aA] ]]; then
+        # Rename the file
+        mv "$pdf_file" "${new_name}.pdf"
+        echo "File renamed successfully."
+        # Set auto_rename flag for remaining files
+        auto_rename=true
     else
         echo "File kept with original name."
     fi

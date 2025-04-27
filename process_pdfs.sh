@@ -30,25 +30,6 @@ extract_text() {
     fi
 }
 
-# Function to check if PDF already has text
-has_text() {
-    local pdf_file="$1"
-    local text_file="${pdf_file%.pdf}.txt"
-
-    # Try to get text with sidecar
-    if ocrmypdf "$pdf_file" "$pdf_file" --force-ocr --sidecar "$text_file" >/dev/null 2>&1; then
-        if [ -f "$text_file" ]; then
-            local text_length=$(wc -c < "$text_file")
-            rm "$text_file"
-            [ $text_length -gt 128 ]
-        else
-            return 1
-        fi
-    else
-        return 1
-    fi
-}
-
 # Function to generate filename using Ollama API
 generate_filename() {
     local text="$1"

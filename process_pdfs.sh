@@ -13,7 +13,7 @@ extract_text() {
     local text_file="${pdf_file%.pdf}.txt"
 
     # Run OCR with sidecar text file
-    if ! ocrmypdf "$pdf_file" "$pdf_file" --force-ocr --sidecar "$text_file"; then
+    if ! ocrmypdf "$pdf_file" "$pdf_file" --force-ocr --sidecar "$text_file" --optimize 0 --output-type pdf --fast-web-view 0; then
         echo "Error: OCR failed for $pdf_file"
         return 1
     fi

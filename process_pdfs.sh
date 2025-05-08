@@ -109,11 +109,30 @@ generate_filename() {
         return 1
     fi
 
+    # Check for model-related errors in the response
+    if echo "$response" | jq -e '.error' >/dev/null 2>&1; then
+        local error_msg=$(echo "$response" | jq -r '.error')
+        echo "Error from Ollama API: $error_msg"
+        echo "Please ensure that the llama3.3 model is installed by running:"
+        echo "  ollama pull llama3.3:latest"
+        return 1
+    fi
+
     # Extract the response text from the JSON
     local response_text=$(echo "$response" | jq -r '.response')
 
     if [ -z "$response_text" ]; then
         echo "Error: Could not parse response from Ollama API"
+        return 1
+    fi
+
+    # Check if the response is empty or just whitespace
+    if [[ -z "${response_text// }" ]]; then
+        echo "Error: Empty response from Ollama API"
+        echo "Please ensure that the llama3.3 model is installed and working correctly:"
+        echo "  1. Check if the model is installed: ollama list"
+        echo "  2. If not installed, run: ollama pull llama3.3:latest"
+        echo "  3. If installed but not working, try: ollama rm llama3.3:latest && ollama pull llama3.3:latest"
         return 1
     fi
 

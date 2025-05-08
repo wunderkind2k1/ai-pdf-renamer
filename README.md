@@ -1,6 +1,6 @@
-# PDF Processing Script
+# AI PDF Renamer
 
-This script processes PDF files containing "infographic" in their filename, performs OCR if needed, and generates descriptive filenames using Ollama's AI capabilities.
+A bash script that uses OCR and AI to intelligently rename PDF files based on their content. The script extracts text from PDFs using OCR and then uses Ollama's AI model to generate meaningful filenames.
 
 ## Features
 
@@ -12,64 +12,86 @@ This script processes PDF files containing "infographic" in their filename, perf
 
 ## Requirements
 
-- `ocrmypdf` - For OCR processing
-- `curl` - For API calls
-- `jq` - For JSON processing
-- Ollama running locally with the `llama3.3:latest` model
+- `ocrmypdf`: For PDF text extraction
+- `curl`: For making API requests
+- `jq`: For JSON processing
+- `Ollama`: Running locally with the llama3.3 model
 
 ## Installation
 
-1. Ensure you have the required dependencies installed:
+1. Make sure you have the required dependencies installed:
    ```bash
-   # Install ocrmypdf
-   pip install ocrmypdf
-
-   # Install jq (if not already installed)
-   # On macOS:
-   brew install jq
-   # On Ubuntu/Debian:
-   sudo apt-get install jq
+   # macOS
+   brew install ocrmypdf curl jq
+   brew install ollama
    ```
 
-2. Make sure Ollama is running locally with the llama3.3:latest model:
-   ```bash
-   ollama run llama3.3:latest
-   ```
-
-## Usage
-
-1. Make the script executable:
+2. Make the script executable:
    ```bash
    chmod +x process_pdfs.sh
    ```
 
-2. Run the script:
+## Usage
+
+```bash
+./process_pdfs.sh [OPTIONS] [FILE_PATTERNS...]
+```
+
+### Options
+
+- `-h, --help`: Show help message
+- `-a, --auto`: Automatically rename all files without confirmation
+- `-p, --prompt`: Use a custom prompt for filename generation
+
+### Examples
+
+1. Process all PDF files in current directory:
    ```bash
-   ./process_pdfs.sh
+   ./process_pdfs.sh '*.pdf'
    ```
 
-3. For each PDF file, you'll be presented with options:
-   - `y` - Rename the current file
-   - `n` - Keep the original name
-   - `a` - Rename all remaining files automatically
+2. Process specific files:
+   ```bash
+   ./process_pdfs.sh file1.pdf file2.pdf
+   ```
+
+3. Process files with custom prompt:
+   ```bash
+   ./process_pdfs.sh -p "Create a filename that emphasizes the main topic and date from this text: $text" '*.pdf'
+   ```
+
+4. Process files automatically without confirmation:
+   ```bash
+   ./process_pdfs.sh -a '*.pdf'
+   ```
+
+5. Process files from a list:
+   ```bash
+   cat filelist.txt | xargs ./process_pdfs.sh
+   ```
 
 ## How it Works
 
-1. The script scans the current directory for PDF files containing "infographic" in their name
-2. For each file:
-   - Performs OCR if needed
-   - Extracts text content
-   - Sends the text to Ollama to generate a descriptive filename
-   - Presents renaming options
-3. Generated filenames are:
-   - Concise (max 64 characters)
-   - Contain only important keywords
-   - Use dashes to separate words
-   - Include only alphanumeric characters and dashes
+1. The script processes each PDF file using OCR to extract text content
+2. The extracted text is sent to Ollama's AI model (llama3.3) to generate a meaningful filename
+3. For each file, you can:
+   - Accept the suggested filename
+   - Keep the original name
+   - Automatically rename all remaining files
+   - Use a custom prompt for filename generation
+
+## Default Prompt
+
+The default prompt used for filename generation is:
+```
+Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text.
+```
+
+You can override this using the `-p/--prompt` option.
 
 ## Notes
 
-- The script modifies files in place
-- Original files are replaced with OCR'd versions
-- Generated filenames are based on the content of the PDFs
-- The script might require an active internet connection for Ollama API calls
+- The script requires Ollama to be running locally on port 11434
+- Generated filenames are limited to 64 characters
+- Only alphanumeric characters and dashes are allowed in generated filenames
+- The script will skip non-PDF files and non-existent files

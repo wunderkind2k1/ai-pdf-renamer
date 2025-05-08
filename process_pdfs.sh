@@ -4,8 +4,57 @@
 command -v ocrmypdf >/dev/null 2>&1 || { echo "Error: ocrmypdf is not installed. Please install it first."; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "Error: curl is not installed. Please install it first."; exit 1; }
 
-# Initialize auto_rename flag
+# Display usage information
+usage() {
+    echo "Usage: $0 [OPTIONS] [FILE_PATTERNS...]"
+    echo "Process PDF files and rename them based on their content."
+    echo ""
+    echo "Options:"
+    echo "  -h, --help     Show this help message"
+    echo "  -a, --auto     Automatically rename all files without confirmation"
+    echo "  -p, --prompt   Custom prompt for filename generation"
+    echo ""
+    echo "Examples:"
+    echo "  $0 '*.pdf'                    # Process all PDF files"
+    echo "  $0 '*infographic*.pdf'        # Process files containing 'infographic'"
+    echo "  $0 file1.pdf file2.pdf        # Process specific files"
+    echo "  cat filelist.txt | xargs $0   # Process files listed in filelist.txt"
+    echo "  $0 -p 'custom prompt' *.pdf   # Use custom prompt for filename generation"
+    exit 1
+}
+
+# Initialize variables
 auto_rename=false
+custom_prompt=""
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -a|--auto)
+            auto_rename=true
+            shift
+            ;;
+        -p|--prompt)
+            if [ -z "$2" ]; then
+                echo "Error: Prompt text is required after -p/--prompt"
+                usage
+            fi
+            custom_prompt="$2"
+            shift 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+# If no arguments provided, show usage
+if [ $# -eq 0 ]; then
+    usage
+fi
 
 # Function to extract text from PDF using ocrmypdf sidecar
 extract_text() {
@@ -33,7 +82,8 @@ extract_text() {
 # Function to generate filename using Ollama API
 generate_filename() {
     local text="$1"
-    local prompt="Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text. Text: $text"
+    local default_prompt="Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text. Text: $text"
+    local prompt="${custom_prompt:-$default_prompt}"
 
     # Escape the prompt text for JSON
     local escaped_prompt=$(echo "$prompt" | jq -Rs .)
@@ -70,11 +120,18 @@ generate_filename() {
     echo "$clean_name"
 }
 
-# Process each PDF file containing 'infographic' in the name
-for pdf_file in *infographic*.pdf; do
+# Process each PDF file from the arguments
+for pdf_file in "$@"; do
+    # Skip if not a PDF file
+    if [[ ! "$pdf_file" =~ \.pdf$ ]]; then
+        echo "Skipping non-PDF file: $pdf_file"
+        continue
+    fi
+
+    # Skip if file doesn't exist
     if [ ! -f "$pdf_file" ]; then
-        echo "No PDF files containing 'infographic' found in the current directory."
-        exit 1
+        echo "File not found: $pdf_file"
+        continue
     fi
 
     echo "Processing: $pdf_file"

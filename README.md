@@ -1,10 +1,22 @@
 # AI PDF Renamer
 
-A bash script that uses OCR and AI to intelligently rename PDF files based on their content. The script extracts text from PDFs using OCR and then uses Ollama's AI model to generate meaningful filenames.
+**AI PDF Renamer** is a simple but powerful script that automatically renames PDF files based on their content using AI. By leveraging the capabilities of OpenAI's GPT models, the script reads the text from PDFs and intelligently suggests a more descriptive and context-aware filename. This helps users keep their file libraries organized without the need to open each file and rename it manually.
+
+### 🔍 Why Use It?
+
+Manually renaming downloaded or scanned PDFs — like research papers, invoices, e-books, or contracts — is tedious and time-consuming. Often, files are saved with generic names such as `document.pdf`, `file(3).pdf`, or `scan_2024_05_01.pdf`. This tool solves that problem by reading the document and renaming it to something meaningful based on its contents.
+
+### 💡 Use Cases
+
+- **Researchers & Academics**: Automatically rename papers downloaded from journals to include the title and authors.
+- **Students**: Keep your coursework, notes, and study materials neatly labeled and searchable.
+- **Professionals**: Organize invoices, contracts, and reports without having to open and scan each document manually.
+- **Anyone with a messy Downloads folder**: Bring order to chaos by turning vague file names into descriptive ones.
+
 
 ## Features
 
-- Automatically processes all PDF files containing "infographic" in their filename
+- Automatically processes all PDF files containing for example "infographic" in their filename
 - Performs OCR on PDFs using `ocrmypdf`
 - Extracts text content from PDFs
 - Generates concise, descriptive filenames using Ollama's AI
@@ -26,7 +38,16 @@ A bash script that uses OCR and AI to intelligently rename PDF files based on th
    brew install ollama
    ```
 
-2. Make the script executable:
+2. Download and set up the llama3.3 model:
+   ```bash
+   # Start Ollama service
+   ollama serve
+
+   # In a new terminal, pull the llama3.3 model
+   ollama pull llama3.3:latest
+   ```
+
+3. Make the script executable:
    ```bash
    chmod +x process_pdfs.sh
    ```

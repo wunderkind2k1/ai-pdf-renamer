@@ -1,3 +1,6 @@
+![image](https://github.com/user-attachments/assets/8512bc6d-9522-41b8-ac68-679a931aec7a)
+
+
 # AI PDF Renamer
 
 **AI PDF Renamer** is a simple but powerful script that automatically renames PDF files based on their content using AI. By leveraging the capabilities of OpenAI's GPT models, the script reads the text from PDFs and intelligently suggests a more descriptive and context-aware filename. This helps users keep their file libraries organized without the need to open each file and rename it manually.

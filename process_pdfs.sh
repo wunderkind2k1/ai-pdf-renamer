@@ -3,6 +3,14 @@
 # Check if required commands are available
 command -v ocrmypdf >/dev/null 2>&1 || { echo "Error: ocrmypdf is not installed. Please install it first."; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "Error: curl is not installed. Please install it first."; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "Error: jq is not installed. Please install it first."; exit 1; }
+command -v ollama >/dev/null 2>&1 || { echo "Error: ollama is not installed. Please install it first."; exit 1; }
+
+# Check if Ollama service is running
+if ! curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
+    echo "Error: Ollama service is not running. Please start it with 'ollama serve'"
+    exit 1
+fi
 
 # Display usage information
 usage() {

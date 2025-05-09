@@ -152,7 +152,7 @@ The Go implementation can be built in two ways:
 
    ### Advantages of Dagger Build
    - **Cross-Platform Support**: Builds binaries for all major platforms in a single run
-   - **Minimal Requirements**: Only requires a running Docker host - no need to install Go or any other build tools
+   - **Minimal Requirements**: Only requires a running Docker host - no need to install Go or any other build tools (if you alreade have ./dagger/main.go build as an executable)
    - **CI/CD Ready**: Can be easily integrated into CI/CD pipelines for automated builds
    - **Reproducible**: Builds are consistent across different environments thanks to containerization
    - **Isolated**: Build process runs in containers, ensuring no conflicts with local development environment

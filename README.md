@@ -3,7 +3,7 @@
 
 # AI PDF Renamer
 
-**AI PDF Renamer** is a simple but powerful script that automatically renames PDF files based on their content using AI. By leveraging the capabilities of OpenAI's GPT models, the script reads the text from PDFs and intelligently suggests a more descriptive and context-aware filename. This helps users keep their file libraries organized without the need to open each file and rename it manually.
+**AI PDF Renamer** is a simple but powerful tool that automatically renames PDF files based on their content using AI. By leveraging the capabilities of Ollama's AI models, the tool reads the text from PDFs and intelligently suggests a more descriptive and context-aware filename. This helps users keep their file libraries organized without the need to open each file and rename it manually.
 
 ### 🔍 Why Use It?
 
@@ -16,7 +16,6 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 - **Professionals**: Organize invoices, contracts, and reports without having to open and scan each document manually.
 - **Anyone with a messy Downloads folder**: Bring order to chaos by turning vague file names into descriptive ones.
 
-
 ## Features
 
 - Automatically processes all PDF files containing for example "infographic" in their filename
@@ -24,6 +23,8 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 - Extracts text content from PDFs
 - Generates concise, descriptive filenames using Ollama's AI
 - Interactive renaming with options for single or batch processing
+- Available in both shell script and Go implementations
+- Cross-platform support (Linux, macOS, Windows)
 
 ## Requirements
 
@@ -50,15 +51,29 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
    ollama pull llama3.3:latest
    ```
 
-3. Make the script executable:
+3. Choose your preferred implementation:
+
+   ### Shell Script Version
    ```bash
    chmod +x process_pdfs.sh
    ```
 
+   ### Go Version
+   ```bash
+   # Standard build
+   go build -o ai-pdf-renamer main.go
+
+   # Or use the Dagger build for cross-platform binaries
+   cd dagger
+   go run main.go
+   ```
+
 ## Usage
 
+Both implementations provide the same functionality and command-line interface:
+
 ```bash
-./process_pdfs.sh [OPTIONS] [FILE_PATTERNS...]
+./ai-pdf-renamer [OPTIONS] [FILE_PATTERNS...]
 ```
 
 ### Options
@@ -71,32 +86,32 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 
 1. Process all PDF files in current directory:
    ```bash
-   ./process_pdfs.sh '*.pdf'
+   ./ai-pdf-renamer '*.pdf'
    ```
 
 2. Process specific files:
    ```bash
-   ./process_pdfs.sh file1.pdf file2.pdf
+   ./ai-pdf-renamer file1.pdf file2.pdf
    ```
 
 3. Process files with custom prompt:
    ```bash
-   ./process_pdfs.sh -p "Create a filename that emphasizes the main topic and date from this text: $text" '*.pdf'
+   ./ai-pdf-renamer -p "Create a filename that emphasizes the main topic and date from this text: $text" '*.pdf'
    ```
 
 4. Process files automatically without confirmation:
    ```bash
-   ./process_pdfs.sh -a '*.pdf'
+   ./ai-pdf-renamer -a '*.pdf'
    ```
 
 5. Process files from a list:
    ```bash
-   cat filelist.txt | xargs ./process_pdfs.sh
+   cat filelist.txt | xargs ./ai-pdf-renamer
    ```
 
 ## How it Works
 
-1. The script processes each PDF file using OCR to extract text content
+1. The tool processes each PDF file using OCR to extract text content
 2. The extracted text is sent to Ollama's AI model (llama3.3) to generate a meaningful filename
 3. For each file, you can:
    - Accept the suggested filename
@@ -113,9 +128,38 @@ Extract the most important keywords from this text and create a filename. The fi
 
 You can override this using the `-p/--prompt` option.
 
+## Build Options
+
+The Go implementation can be built in two ways:
+
+1. **Standard Go Build**
+   ```bash
+   go build -o ai-pdf-renamer main.go
+   ```
+   This creates a binary for your current platform.
+
+2. **Cross-Platform Build with Dagger**
+   ```bash
+   cd dagger
+   go run main.go
+   ```
+   This creates binaries for multiple platforms:
+   - Linux (amd64, arm64)
+   - macOS (amd64, arm64)
+   - Windows (amd64)
+
+   The binaries will be placed in the `bin` directory with platform-specific names.
+
+   ### Advantages of Dagger Build
+   - **Cross-Platform Support**: Builds binaries for all major platforms in a single run
+   - **Minimal Requirements**: Only requires a running Docker host - no need to install Go or any other build tools
+   - **CI/CD Ready**: Can be easily integrated into CI/CD pipelines for automated builds
+   - **Reproducible**: Builds are consistent across different environments thanks to containerization
+   - **Isolated**: Build process runs in containers, ensuring no conflicts with local development environment
+
 ## Notes
 
-- The script requires Ollama to be running locally on port 11434
+- The tool requires Ollama to be running locally on port 11434
 - Generated filenames are limited to 64 characters
 - Only alphanumeric characters and dashes are allowed in generated filenames
-- The script will skip non-PDF files and non-existent files
+- The tool will skip non-PDF files and non-existent files

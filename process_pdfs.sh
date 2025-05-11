@@ -12,6 +12,13 @@ if ! curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
     exit 1
 fi
 
+# Check if llama3.3 model is available
+if ! curl -s http://localhost:11434/api/tags | jq -e '.models[] | select(.name=="llama3.3:latest")' >/dev/null 2>&1; then
+    echo "Error: llama3.3 model is not installed in Ollama."
+    echo "Please install it by running: ollama pull llama3.3:latest"
+    exit 1
+fi
+
 # Display usage information
 usage() {
     echo "Usage: $0 [OPTIONS] [FILE_PATTERNS...]"

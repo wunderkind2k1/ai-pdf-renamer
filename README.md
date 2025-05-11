@@ -35,6 +35,10 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 
 ## Installation
 
+### Shell Script Version (Recommended for Most Users)
+
+The shell script version is the simplest way to get started and provides all the functionality you need. It's easy to use and doesn't require any compilation.
+
 1. Make sure you have the required dependencies installed:
    ```bash
    # macOS
@@ -51,63 +55,92 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
    ollama pull llama3.3:latest
    ```
 
-3. Choose your preferred implementation:
-
-   ### Shell Script Version
+3. Make the script executable:
    ```bash
    chmod +x process_pdfs.sh
    ```
 
-   ### Go Version
-   ```bash
-   # Standard build
-   go build -o ai-pdf-renamer main.go
+### Go Version (For Advanced Users)
 
-   # Or use the Dagger build for cross-platform binaries
+The Go implementation provides the same functionality as the shell script but is compiled into a binary. This version is recommended if you:
+- Need to distribute the tool to users who shouldn't need to install dependencies
+- Want to integrate the tool into other systems
+- Prefer working with compiled binaries
+
+To build the Go version:
+
+1. Install Go (version 1.21 or later)
+2. Choose your build method:
+
+   #### Standard Build
+   ```bash
+   go build -o ai-pdf-renamer main.go
+   ```
+   This creates a binary for your current platform.
+
+   #### Cross-Platform Build with Dagger
+   ```bash
    cd dagger
    go run main.go
    ```
+   This creates binaries for multiple platforms (see Build Options section below).
 
 ## Usage
 
-Both implementations provide the same functionality and command-line interface:
+### ⚠️ Important Security Note
+
+Before using the tool with automatic renaming (`-a` option), it's crucial to:
+1. Test the tool with a few sample files first
+2. Verify that the generated filenames are appropriate
+3. Review the content extraction and AI suggestions
+4. Only use automatic renaming (`-a`) once you're confident in the results
+
+### Shell Script Usage
 
 ```bash
-./ai-pdf-renamer [OPTIONS] [FILE_PATTERNS...]
+./process_pdfs.sh [OPTIONS] [FILE_PATTERNS...]
 ```
 
-### Options
-
+#### Options
 - `-h, --help`: Show help message
-- `-a, --auto`: Automatically rename all files without confirmation
+- `-a, --auto`: Automatically rename all files without confirmation (use with caution!)
 - `-p, --prompt`: Use a custom prompt for filename generation
 
-### Examples
+#### Examples
 
-1. Process all PDF files in current directory:
+1. Test the tool with a single file first:
    ```bash
-   ./ai-pdf-renamer '*.pdf'
+   ./process_pdfs.sh document.pdf
    ```
 
-2. Process specific files:
+2. Process all PDF files in current directory (with confirmation):
    ```bash
-   ./ai-pdf-renamer file1.pdf file2.pdf
+   ./process_pdfs.sh '*.pdf'
    ```
 
-3. Process files with custom prompt:
+3. Process specific files:
    ```bash
-   ./ai-pdf-renamer -p "Create a filename that emphasizes the main topic and date from this text: $text" '*.pdf'
+   ./process_pdfs.sh file1.pdf file2.pdf
    ```
 
-4. Process files automatically without confirmation:
+4. Process files with custom prompt:
    ```bash
-   ./ai-pdf-renamer -a '*.pdf'
+   ./process_pdfs.sh -p "Create a filename that emphasizes the main topic and date from this text: $text" '*.pdf'
    ```
 
-5. Process files from a list:
+5. Process files automatically (only after testing!):
    ```bash
-   cat filelist.txt | xargs ./ai-pdf-renamer
+   ./process_pdfs.sh -a '*.pdf'
    ```
+
+6. Process files from a list:
+   ```bash
+   cat filelist.txt | xargs ./process_pdfs.sh
+   ```
+
+### Go Binary Usage
+
+If you're using the Go implementation, replace `./process_pdfs.sh` with `./ai-pdf-renamer` in all the examples above. The functionality and options are identical.
 
 ## How it Works
 

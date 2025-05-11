@@ -42,6 +42,39 @@ func checkDependencies() error {
 	}
 	defer resp.Body.Close()
 
+	// Check if llama3.3 model is available
+	resp, err = http.Get("http://localhost:11434/api/tags")
+	if err != nil {
+		return fmt.Errorf("error checking Ollama models: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading Ollama models response: %v", err)
+	}
+
+	var models struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(body, &models); err != nil {
+		return fmt.Errorf("error parsing Ollama models response: %v", err)
+	}
+
+	modelFound := false
+	for _, model := range models.Models {
+		if model.Name == "llama3.3:latest" {
+			modelFound = true
+			break
+		}
+	}
+
+	if !modelFound {
+		return fmt.Errorf("error: llama3.3 model is not installed in Ollama.\nPlease install it by running: ollama pull llama3.3:latest")
+	}
+
 	return nil
 }
 

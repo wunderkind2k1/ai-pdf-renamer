@@ -189,7 +189,7 @@ The Go implementation can be built in two ways:
    - macOS (amd64, arm64)
    - Windows (amd64)
 
-   The binaries will be placed in the `bin` directory with platform-specific names.
+   The binaries will be placed in the `build` directory with platform-specific names.
 
    ### Advantages of Dagger Build
    - **Cross-Platform Support**: Builds binaries for all major platforms in a single run

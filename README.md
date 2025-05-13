@@ -31,7 +31,7 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 - `ocrmypdf`: For PDF text extraction
 - `curl`: For making API requests
 - `jq`: For JSON processing
-- `Ollama`: Running locally with the llama3.3 model
+- `Ollama`: Running locally with the gemma:1b model (or any other model specified)
 
 ## Installation
 
@@ -46,14 +46,16 @@ The shell script version is the simplest way to get started and provides all the
    brew install ollama
    ```
 
-2. Download and set up the llama3.3 model:
+2. Download and set up the gemma:1b model (or your preferred model):
    ```bash
    # Start Ollama service
    ollama serve
 
-   # In a new terminal, pull the llama3.3 model
-   ollama pull llama3.3:latest
+   # In a new terminal, pull the default model
+   ollama pull gemma:1b
    ```
+
+   Note: You can use any Ollama model by specifying it with the `-m` or `--model` option.
 
 3. Make the script executable:
    ```bash
@@ -105,6 +107,7 @@ Before using the tool with automatic renaming (`-a` option), it's crucial to:
 - `-h, --help`: Show help message
 - `-a, --auto`: Automatically rename all files without confirmation (use with caution!)
 - `-p, --prompt`: Use a custom prompt for filename generation
+- `-m, --model`: Specify the Ollama model to use (default: gemma:1b)
 
 #### Examples
 
@@ -128,24 +131,29 @@ Before using the tool with automatic renaming (`-a` option), it's crucial to:
    ./process_pdfs.sh -p "Create a filename that emphasizes the main topic and date from this text: $text" '*.pdf'
    ```
 
-5. Process files automatically (only after testing!):
+5. Process files with a different model:
+   ```bash
+   ./process_pdfs.sh -m llama3.3:latest '*.pdf'
+   ```
+
+6. Process files automatically (only after testing!):
    ```bash
    ./process_pdfs.sh -a '*.pdf'
    ```
 
-6. Process files from a list:
+7. Process files from a list:
    ```bash
    cat filelist.txt | xargs ./process_pdfs.sh
    ```
 
 ### Go Binary Usage
 
-If you're using the Go implementation, replace `./process_pdfs.sh` with `./ai-pdf-renamer` in all the examples above. The functionality and options are identical.
+If you're using the Go implementation, replace `./process_pdfs.sh` with `./ai-pdf-renamer` in all the examples above. The functionality and options are identical, including the model selection option (`-m` or `--model`).
 
 ## How it Works
 
 1. The tool processes each PDF file using OCR to extract text content
-2. The extracted text is sent to Ollama's AI model (llama3.3) to generate a meaningful filename
+2. The extracted text is sent to Ollama's AI model (gemma:1b) to generate a meaningful filename
 3. For each file, you can:
    - Accept the suggested filename
    - Keep the original name

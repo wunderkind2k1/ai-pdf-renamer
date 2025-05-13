@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added explicit llama3.3 model availability check at startup for both shell script and Go implementations
+- Added model selection option (`-m` or `--model`) to both shell script and Go implementations
+- Added explicit model availability check at startup for both shell script and Go implementations
 - Added improved error handling for model-related issues
 - Added prevention of file operations when required model is not available
 - Initial shell script implementation
@@ -26,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated binary export from build containers
 
 ### Changed
+- Changed default model from llama3.3:latest to gemma:1b for better performance and smaller size
+- Updated README to include model selection documentation
 - Improved error messages and user feedback
 - Enhanced prompt handling for better filename generation
 - Updated README to reflect both shell script and Go implementations
@@ -33,10 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized command examples to use generic binary name
 
 ### Fixed
+- Potential risk of file operations when required model is not installed
 - Various shell script compatibility issues
 - Error handling for missing dependencies
 - File permission handling
-- Potential risk of file operations when llama3.3 model is not installed
 
 ### Removed
 - Docker-related components and documentation

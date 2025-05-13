@@ -12,12 +12,10 @@ if ! curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
     exit 1
 fi
 
-# Check if llama3.3 model is available
-if ! curl -s http://localhost:11434/api/tags | jq -e '.models[] | select(.name=="llama3.3:latest")' >/dev/null 2>&1; then
-    echo "Error: llama3.3 model is not installed in Ollama."
-    echo "Please install it by running: ollama pull llama3.3:latest"
-    exit 1
-fi
+# Initialize variables
+auto_rename=false
+custom_prompt=""
+model="gemma:1b"
 
 # Display usage information
 usage() {
@@ -28,6 +26,7 @@ usage() {
     echo "  -h, --help     Show this help message"
     echo "  -a, --auto     Automatically rename all files without confirmation"
     echo "  -p, --prompt   Custom prompt for filename generation"
+    echo "  -m, --model    Ollama model to use (default: gemma:1b)"
     echo ""
     echo "Examples:"
     echo "  $0 '*.pdf'                    # Process all PDF files"
@@ -35,12 +34,9 @@ usage() {
     echo "  $0 file1.pdf file2.pdf        # Process specific files"
     echo "  cat filelist.txt | xargs $0   # Process files listed in filelist.txt"
     echo "  $0 -p 'custom prompt' *.pdf   # Use custom prompt for filename generation"
+    echo "  $0 -m llama3.3:latest *.pdf   # Use a different Ollama model"
     exit 1
 }
-
-# Initialize variables
-auto_rename=false
-custom_prompt=""
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -60,6 +56,14 @@ while [[ $# -gt 0 ]]; do
             custom_prompt="$2"
             shift 2
             ;;
+        -m|--model)
+            if [ -z "$2" ]; then
+                echo "Error: Model name is required after -m/--model"
+                usage
+            fi
+            model="$2"
+            shift 2
+            ;;
         *)
             break
             ;;
@@ -69,6 +73,13 @@ done
 # If no arguments provided, show usage
 if [ $# -eq 0 ]; then
     usage
+fi
+
+# Check if the specified model is available
+if ! curl -s http://localhost:11434/api/tags | jq -e --arg model "$model" '.models[] | select(.name==$model)' >/dev/null 2>&1; then
+    echo "Error: $model model is not installed in Ollama."
+    echo "Please install it by running: ollama pull $model"
+    exit 1
 fi
 
 # Function to extract text from PDF using ocrmypdf sidecar
@@ -104,7 +115,7 @@ generate_filename() {
     local escaped_prompt=$(echo "$prompt" | jq -Rs .)
 
     # Create the JSON payload
-    local json_payload="{\"model\":\"llama3.3:latest\",\"prompt\":$escaped_prompt,\"stream\":false}"
+    local json_payload="{\"model\":\"$model\",\"prompt\":$escaped_prompt,\"stream\":false}"
 
     # Call Ollama API
     local response=$(curl -s -X POST http://localhost:11434/api/generate \
@@ -120,8 +131,8 @@ generate_filename() {
     if echo "$response" | jq -e '.error' >/dev/null 2>&1; then
         local error_msg=$(echo "$response" | jq -r '.error')
         echo "Error from Ollama API: $error_msg"
-        echo "Please ensure that the llama3.3 model is installed by running:"
-        echo "  ollama pull llama3.3:latest"
+        echo "Please ensure that the $model model is installed by running:"
+        echo "  ollama pull $model"
         return 1
     fi
 
@@ -136,10 +147,10 @@ generate_filename() {
     # Check if the response is empty or just whitespace
     if [[ -z "${response_text// }" ]]; then
         echo "Error: Empty response from Ollama API"
-        echo "Please ensure that the llama3.3 model is installed and working correctly:"
+        echo "Please ensure that the $model model is installed and working correctly:"
         echo "  1. Check if the model is installed: ollama list"
-        echo "  2. If not installed, run: ollama pull llama3.3:latest"
-        echo "  3. If installed but not working, try: ollama rm llama3.3:latest && ollama pull llama3.3:latest"
+        echo "  2. If not installed, run: ollama pull $model"
+        echo "  3. If installed but not working, try: ollama rm $model && ollama pull $model"
         return 1
     fi
 

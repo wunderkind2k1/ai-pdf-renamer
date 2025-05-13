@@ -8,7 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added explicit llama3.3 model availability check at startup for both shell script and Go implementations
+- Added hardware requirements documentation for supported models
+- Added detailed model selection documentation with recommendations for gemma3:1b and llama3.3:latest
+- Added testing documentation to README (Go tests only, shell script testing TODO)
+- Added improved command line argument handling in shell script
+- Added better error messages for invalid command line options
+- Added test suite for Dagger build process
+- Added tests for build platforms and output paths
+- Added focused test suite for configuration handling
+- Added tests for default config values and flag parsing
+- Added proper exit codes for Dagger build process to support CI/CD pipelines
+- Added model selection option (`-m` or `--model`) to both shell script and Go implementations
+- Added explicit model availability check at startup for both shell script and Go implementations
 - Added improved error handling for model-related issues
 - Added prevention of file operations when required model is not available
 - Initial shell script implementation
@@ -26,17 +37,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated binary export from build containers
 
 ### Changed
-- Improved error messages and user feedback
-- Enhanced prompt handling for better filename generation
+- Updated model hardware requirements to provide general guidance instead of specific RAM numbers
+- Updated testing documentation to clarify shell script testing status
+- Refactored shell script to improve function organization and maintainability
+- Changed build output directory from 'bin' to 'build' for better convention
+- Changed default model from llama3.3:latest to gemma3:1b for better performance and smaller size
+- Updated README to include model selection documentation
 - Updated README to reflect both shell script and Go implementations
+- Enhanced prompt handling for better filename generation
+- Improved error messages and user feedback
 - Improved build documentation with Dagger advantages
 - Standardized command examples to use generic binary name
 
 ### Fixed
+- Potential risk of file operations when required model is not installed
 - Various shell script compatibility issues
 - Error handling for missing dependencies
 - File permission handling
-- Potential risk of file operations when llama3.3 model is not installed
 
 ### Removed
 - Docker-related components and documentation

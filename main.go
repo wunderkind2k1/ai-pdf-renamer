@@ -14,11 +14,17 @@ import (
 	"strings"
 )
 
+const defaultPrompt = "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
+
 // Config holds the application configuration
 type Config struct {
 	AutoRename   bool
 	CustomPrompt string
+	Model        string
 }
+
+// Global config variable
+var config Config
 
 // OllamaResponse represents the response from Ollama API
 type OllamaResponse struct {
@@ -42,7 +48,7 @@ func checkDependencies() error {
 	}
 	defer resp.Body.Close()
 
-	// Check if llama3.3 model is available
+	// Check if the specified model is available
 	resp, err = http.Get("http://localhost:11434/api/tags")
 	if err != nil {
 		return fmt.Errorf("error checking Ollama models: %v", err)
@@ -65,14 +71,14 @@ func checkDependencies() error {
 
 	modelFound := false
 	for _, model := range models.Models {
-		if model.Name == "llama3.3:latest" {
+		if model.Name == config.Model {
 			modelFound = true
 			break
 		}
 	}
 
 	if !modelFound {
-		return fmt.Errorf("error: llama3.3 model is not installed in Ollama.\nPlease install it by running: ollama pull llama3.3:latest")
+		return fmt.Errorf("error: %s model is not installed in Ollama.\nPlease install it by running: ollama pull %s", config.Model, config.Model)
 	}
 
 	return nil
@@ -107,16 +113,10 @@ func extractText(pdfFile string) (string, error) {
 }
 
 // generateFilename generates a filename using Ollama API
-func generateFilename(text string, customPrompt string) (string, error) {
-	defaultPrompt := "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text. Text: " + text
-	prompt := customPrompt
-	if prompt == "" {
-		prompt = defaultPrompt
-	}
-
+func generateFilename(text string, prompt string) (string, error) {
 	// Create the JSON payload
 	payload := map[string]interface{}{
-		"model":  "llama3.3:latest",
+		"model":  config.Model,
 		"prompt": prompt,
 		"stream": false,
 	}
@@ -144,11 +144,11 @@ func generateFilename(text string, customPrompt string) (string, error) {
 	}
 
 	if ollamaResp.Error != "" {
-		return "", fmt.Errorf("error from Ollama API: %s\nPlease ensure that the llama3.3 model is installed by running:\n  ollama pull llama3.3:latest", ollamaResp.Error)
+		return "", fmt.Errorf("error from Ollama API: %s\nPlease ensure that the %s model is installed by running:\n  ollama pull %s", ollamaResp.Error, config.Model, config.Model)
 	}
 
 	if ollamaResp.Response == "" {
-		return "", fmt.Errorf("error: Empty response from Ollama API\nPlease ensure that the llama3.3 model is installed and working correctly:\n  1. Check if the model is installed: ollama list\n  2. If not installed, run: ollama pull llama3.3:latest\n  3. If installed but not working, try: ollama rm llama3.3:latest && ollama pull llama3.3:latest")
+		return "", fmt.Errorf("error: Empty response from Ollama API\nPlease ensure that the %s model is installed and working correctly:\n  1. Check if the model is installed: ollama list\n  2. If not installed, run: ollama pull %s\n  3. If installed but not working, try: ollama rm %s && ollama pull %s", config.Model, config.Model, config.Model, config.Model)
 	}
 
 	// Clean up the response
@@ -164,11 +164,29 @@ func generateFilename(text string, customPrompt string) (string, error) {
 	return cleanName, nil
 }
 
+// getDefaultConfig returns the default configuration
+func getDefaultConfig() Config {
+	return Config{
+		AutoRename:   false,
+		CustomPrompt: defaultPrompt,
+		Model:        "gemma3:1b",
+	}
+}
+
 func main() {
-	// Parse command line flags
-	autoRename := flag.Bool("auto", false, "Automatically rename all files without confirmation")
-	customPrompt := flag.String("prompt", "", "Custom prompt for filename generation")
+	// Initialize config with defaults
+	defaultConfig := getDefaultConfig()
+	autoRename := flag.Bool("auto", defaultConfig.AutoRename, "Automatically rename all files without confirmation")
+	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "Custom prompt for filename generation")
+	model := flag.String("model", defaultConfig.Model, "Ollama model to use for filename generation")
 	flag.Parse()
+
+	// Initialize config
+	config = Config{
+		AutoRename:   *autoRename,
+		CustomPrompt: *customPrompt,
+		Model:        *model,
+	}
 
 	// Check dependencies
 	if err := checkDependencies(); err != nil {
@@ -218,7 +236,8 @@ func main() {
 			fmt.Printf("Extracted text length: %d characters\n", len(text))
 
 			// Generate new filename
-			newName, err := generateFilename(text, *customPrompt)
+			prompt := config.CustomPrompt + " Text: " + text
+			newName, err := generateFilename(text, prompt)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				continue

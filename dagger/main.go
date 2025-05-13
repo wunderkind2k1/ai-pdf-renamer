@@ -10,8 +10,39 @@ import (
 	"dagger.io/dagger"
 )
 
+// BuildPlatforms defines the target platforms for cross-compilation
+var BuildPlatforms = []struct {
+	os   string
+	arch string
+}{
+	{"linux", "amd64"},
+	{"linux", "arm64"},
+	{"darwin", "amd64"},
+	{"darwin", "arm64"},
+	{"windows", "amd64"},
+}
+
+// getOutputDir returns the absolute path to the output directory
+func getOutputDir() (string, error) {
+	projectRoot, err := filepath.Abs("..")
+	if err != nil {
+		return "", fmt.Errorf("error getting absolute path: %w", err)
+	}
+	return filepath.Join(projectRoot, "build"), nil
+}
+
+// getExportPath returns the path where a binary should be exported for a given platform
+func getExportPath(projectRoot string, platform struct{ os, arch string }) string {
+	output := fmt.Sprintf("build/ai-pdf-renamer-%s-%s", platform.os, platform.arch)
+	if platform.os == "windows" {
+		output += ".exe"
+	}
+	return filepath.Join(projectRoot, output)
+}
+
 func main() {
 	ctx := context.Background()
+	failedBuilds := 0
 
 	fmt.Println("🚀 Starting Dagger build process...")
 
@@ -24,18 +55,6 @@ func main() {
 	}
 	defer client.Close()
 	fmt.Println("✅ Connected to Dagger")
-
-	// Define platforms to build for
-	platforms := []struct {
-		os   string
-		arch string
-	}{
-		{"linux", "amd64"},
-		{"linux", "arm64"},
-		{"darwin", "amd64"},
-		{"darwin", "arm64"},
-		{"windows", "amd64"},
-	}
 
 	// Get absolute path to project root
 	fmt.Println("📂 Setting up project paths...")
@@ -56,20 +75,24 @@ func main() {
 	container = container.WithMountedDirectory("/src", src)
 	container = container.WithWorkdir("/src")
 
-	// Create bin directory if it doesn't exist
-	binDir := filepath.Join(projectRoot, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		fmt.Printf("❌ Error creating bin directory: %v\n", err)
+	// Create output directory if it doesn't exist
+	outputDir, err := getOutputDir()
+	if err != nil {
+		fmt.Printf("❌ Error getting output directory: %v\n", err)
+		os.Exit(1)
+	}
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		fmt.Printf("❌ Error creating output directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("🏗️  Starting builds for %d platforms...\n", len(platforms))
+	fmt.Printf("🏗️  Starting builds for %d platforms...\n", len(BuildPlatforms))
 
 	// Build for each platform
-	for i, platform := range platforms {
+	for i, platform := range BuildPlatforms {
 		startTime := time.Now()
 		fmt.Printf("\n📦 Building for %s/%s (%d/%d)...\n",
-			platform.os, platform.arch, i+1, len(platforms))
+			platform.os, platform.arch, i+1, len(BuildPlatforms))
 
 		// Set environment variables for cross-compilation
 		container = container.WithEnvVariable("GOOS", platform.os)
@@ -77,7 +100,7 @@ func main() {
 		container = container.WithEnvVariable("CGO_ENABLED", "0")
 
 		// Build the binary
-		output := fmt.Sprintf("bin/ai-pdf-renamer-%s-%s", platform.os, platform.arch)
+		output := fmt.Sprintf("build/ai-pdf-renamer-%s-%s", platform.os, platform.arch)
 		if platform.os == "windows" {
 			output += ".exe"
 		}
@@ -86,9 +109,11 @@ func main() {
 		built := container.WithExec([]string{"go", "build", "-o", output, "main.go"})
 
 		// Export the binary
-		_, err := built.File(output).Export(ctx, filepath.Join(projectRoot, output))
+		exportPath := getExportPath(projectRoot, platform)
+		_, err := built.File(output).Export(ctx, exportPath)
 		if err != nil {
 			fmt.Printf("❌ Error exporting binary for %s/%s: %v\n", platform.os, platform.arch, err)
+			failedBuilds++
 			continue
 		}
 
@@ -97,5 +122,10 @@ func main() {
 			platform.os, platform.arch, duration.Round(time.Millisecond))
 	}
 
-	fmt.Println("\n🎉 Build process completed!")
+	if failedBuilds > 0 {
+		fmt.Printf("\n❌ Build process completed with %d failed builds!\n", failedBuilds)
+		os.Exit(1)
+	}
+
+	fmt.Println("\n🎉 Build process completed successfully!")
 }

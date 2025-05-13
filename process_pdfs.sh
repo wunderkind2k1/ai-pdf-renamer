@@ -1,76 +1,5 @@
 #!/usr/bin/env bash
 
-# Check if required commands are available
-command -v ocrmypdf >/dev/null 2>&1 || { echo "Error: ocrmypdf is not installed. Please install it first."; exit 1; }
-command -v curl >/dev/null 2>&1 || { echo "Error: curl is not installed. Please install it first."; exit 1; }
-command -v jq >/dev/null 2>&1 || { echo "Error: jq is not installed. Please install it first."; exit 1; }
-command -v ollama >/dev/null 2>&1 || { echo "Error: ollama is not installed. Please install it first."; exit 1; }
-
-# Check if Ollama service is running
-if ! curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
-    echo "Error: Ollama service is not running. Please start it with 'ollama serve'"
-    exit 1
-fi
-
-# Check if llama3.3 model is available
-if ! curl -s http://localhost:11434/api/tags | jq -e '.models[] | select(.name=="llama3.3:latest")' >/dev/null 2>&1; then
-    echo "Error: llama3.3 model is not installed in Ollama."
-    echo "Please install it by running: ollama pull llama3.3:latest"
-    exit 1
-fi
-
-# Display usage information
-usage() {
-    echo "Usage: $0 [OPTIONS] [FILE_PATTERNS...]"
-    echo "Process PDF files and rename them based on their content."
-    echo ""
-    echo "Options:"
-    echo "  -h, --help     Show this help message"
-    echo "  -a, --auto     Automatically rename all files without confirmation"
-    echo "  -p, --prompt   Custom prompt for filename generation"
-    echo ""
-    echo "Examples:"
-    echo "  $0 '*.pdf'                    # Process all PDF files"
-    echo "  $0 '*infographic*.pdf'        # Process files containing 'infographic'"
-    echo "  $0 file1.pdf file2.pdf        # Process specific files"
-    echo "  cat filelist.txt | xargs $0   # Process files listed in filelist.txt"
-    echo "  $0 -p 'custom prompt' *.pdf   # Use custom prompt for filename generation"
-    exit 1
-}
-
-# Initialize variables
-auto_rename=false
-custom_prompt=""
-
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -h|--help)
-            usage
-            ;;
-        -a|--auto)
-            auto_rename=true
-            shift
-            ;;
-        -p|--prompt)
-            if [ -z "$2" ]; then
-                echo "Error: Prompt text is required after -p/--prompt"
-                usage
-            fi
-            custom_prompt="$2"
-            shift 2
-            ;;
-        *)
-            break
-            ;;
-    esac
-done
-
-# If no arguments provided, show usage
-if [ $# -eq 0 ]; then
-    usage
-fi
-
 # Function to extract text from PDF using ocrmypdf sidecar
 extract_text() {
     local pdf_file="$1"
@@ -98,13 +27,13 @@ extract_text() {
 generate_filename() {
     local text="$1"
     local default_prompt="Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text. Text: $text"
-    local prompt="${custom_prompt:-$default_prompt}"
+    local prompt="${CUSTOM_PROMPT:-$default_prompt}"
 
     # Escape the prompt text for JSON
     local escaped_prompt=$(echo "$prompt" | jq -Rs .)
 
     # Create the JSON payload
-    local json_payload="{\"model\":\"llama3.3:latest\",\"prompt\":$escaped_prompt,\"stream\":false}"
+    local json_payload="{\"model\":\"$MODEL\",\"prompt\":$escaped_prompt,\"stream\":false}"
 
     # Call Ollama API
     local response=$(curl -s -X POST http://localhost:11434/api/generate \
@@ -120,8 +49,8 @@ generate_filename() {
     if echo "$response" | jq -e '.error' >/dev/null 2>&1; then
         local error_msg=$(echo "$response" | jq -r '.error')
         echo "Error from Ollama API: $error_msg"
-        echo "Please ensure that the llama3.3 model is installed by running:"
-        echo "  ollama pull llama3.3:latest"
+        echo "Please ensure that the $MODEL model is installed by running:"
+        echo "  ollama pull $MODEL"
         return 1
     fi
 
@@ -136,10 +65,10 @@ generate_filename() {
     # Check if the response is empty or just whitespace
     if [[ -z "${response_text// }" ]]; then
         echo "Error: Empty response from Ollama API"
-        echo "Please ensure that the llama3.3 model is installed and working correctly:"
+        echo "Please ensure that the $MODEL model is installed and working correctly:"
         echo "  1. Check if the model is installed: ollama list"
-        echo "  2. If not installed, run: ollama pull llama3.3:latest"
-        echo "  3. If installed but not working, try: ollama rm llama3.3:latest && ollama pull llama3.3:latest"
+        echo "  2. If not installed, run: ollama pull $MODEL"
+        echo "  3. If installed but not working, try: ollama rm $MODEL && ollama pull $MODEL"
         return 1
     fi
 
@@ -154,68 +83,199 @@ generate_filename() {
     echo "$clean_name"
 }
 
-# Process each PDF file from the arguments
-for pdf_file in "$@"; do
-    # Skip if not a PDF file
-    if [[ ! "$pdf_file" =~ \.pdf$ ]]; then
-        echo "Skipping non-PDF file: $pdf_file"
-        continue
+# Check if required commands are available
+check_dependencies() {
+    local deps=("ocrmypdf" "curl" "jq" "ollama")
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" >/dev/null 2>&1; then
+            echo "Error: $dep is not installed. Please install it first."
+            return 1
+        fi
+    done
+    return 0
+}
+
+# Check if Ollama service is running and model is available
+check_ollama_service() {
+    local model="$1"
+
+    # Check if Ollama service is running
+    if ! curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
+        echo "Error: Ollama service is not running. Please start it with 'ollama serve'"
+        return 1
     fi
 
-    # Skip if file doesn't exist
-    if [ ! -f "$pdf_file" ]; then
-        echo "File not found: $pdf_file"
-        continue
+    # Check if the specified model is available
+    if ! curl -s http://localhost:11434/api/tags | jq -e --arg model "$model" '.models[] | select(.name==$model)' >/dev/null 2>&1; then
+        echo "Error: $model model is not installed in Ollama."
+        echo "Please install it by running: ollama pull $model"
+        return 1
     fi
 
-    echo "Processing: $pdf_file"
+    return 0
+}
 
-    # Extract text using OCR
-    text=$(extract_text "$pdf_file")
-
-    if [ -z "$text" ]; then
-        echo "Error: Could not extract text from $pdf_file"
-        continue
-    fi
-
-    echo "Extracted text length: ${#text} characters"
-
-    # Generate new filename
-    new_name=$(generate_filename "$text")
-
-    if [ -z "$new_name" ]; then
-        echo "Error: Could not generate filename for $pdf_file"
-        continue
-    fi
-
-    # If auto_rename is set, rename automatically
-    if [ "$auto_rename" = true ]; then
-        mv "$pdf_file" "${new_name}.pdf"
-        echo "File automatically renamed to: ${new_name}.pdf"
-        continue
-    fi
-
-    # Ask for confirmation
-    echo "Suggested new filename: $new_name.pdf"
+# Display usage information
+usage() {
+    echo "Usage: $0 [OPTIONS] [FILE_PATTERNS...]"
+    echo "Process PDF files and rename them based on their content."
+    echo ""
     echo "Options:"
-    echo "  y - Rename file"
-    echo "  n - Keep original name"
-    echo "  a - Rename all remaining files automatically"
-    read -p "Choose an option (y/n/a): " confirm
+    echo "  -h, --help     Show this help message"
+    echo "  -a, --auto     Automatically rename all files without confirmation"
+    echo "  -p, --prompt   Custom prompt for filename generation"
+    echo "  -m, --model    Ollama model to use (default: gemma3:1b)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 '*.pdf'                    # Process all PDF files"
+    echo "  $0 '*infographic*.pdf'        # Process files containing 'infographic'"
+    echo "  $0 file1.pdf file2.pdf        # Process specific files"
+    echo "  cat filelist.txt | xargs $0   # Process files listed in filelist.txt"
+    echo "  $0 -p 'custom prompt' *.pdf   # Use custom prompt for filename generation"
+    echo "  $0 -m llama3.3:latest *.pdf   # Use a different Ollama model"
+    exit 1
+}
 
-    if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
-        # Rename the file
-        mv "$pdf_file" "${new_name}.pdf"
-        echo "File renamed successfully."
-    elif [[ $confirm == [aA] ]]; then
-        # Rename the file
-        mv "$pdf_file" "${new_name}.pdf"
-        echo "File renamed successfully."
-        # Set auto_rename flag for remaining files
-        auto_rename=true
-    else
-        echo "File kept with original name."
+# Parse command line arguments
+parse_args() {
+    local auto_rename=false
+    local custom_prompt=""
+    local model="gemma3:1b"
+    local args=()
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                usage
+                ;;
+            -a|--auto)
+                auto_rename=true
+                shift
+                ;;
+            -p|--prompt)
+                if [ -z "$2" ]; then
+                    echo "Error: Prompt text is required after -p/--prompt"
+                    usage
+                fi
+                custom_prompt="$2"
+                shift 2
+                ;;
+            -m|--model)
+                if [ -z "$2" ]; then
+                    echo "Error: Model name is required after -m/--model"
+                    usage
+                fi
+                model="$2"
+                shift 2
+                ;;
+            *)
+                # Only add to args if it doesn't start with a dash
+                if [[ "$1" != -* ]]; then
+                    args+=("$1")
+                else
+                    echo "Error: Unknown option: $1"
+                    usage
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # If no arguments provided, show usage
+    if [ ${#args[@]} -eq 0 ]; then
+        usage
     fi
-done
 
-echo "Processing complete!"
+    # Return values through global variables
+    AUTO_RENAME=$auto_rename
+    CUSTOM_PROMPT=$custom_prompt
+    MODEL=$model
+    ARGS=("${args[@]}")
+}
+
+# Main script
+main() {
+    # Parse command line arguments
+    parse_args "$@"
+
+    # Check dependencies
+    if ! check_dependencies; then
+        exit 1
+    fi
+
+    # Check Ollama service and model
+    if ! check_ollama_service "$MODEL"; then
+        exit 1
+    fi
+
+    # Process each PDF file from the arguments
+    for pdf_file in "${ARGS[@]}"; do
+        # Skip if not a PDF file
+        if [[ ! "$pdf_file" =~ \.pdf$ ]]; then
+            echo "Skipping non-PDF file: $pdf_file"
+            continue
+        fi
+
+        # Skip if file doesn't exist
+        if [ ! -f "$pdf_file" ]; then
+            echo "File not found: $pdf_file"
+            continue
+        fi
+
+        echo "Processing: $pdf_file"
+
+        # Extract text using OCR
+        text=$(extract_text "$pdf_file")
+
+        if [ -z "$text" ]; then
+            echo "Error: Could not extract text from $pdf_file"
+            continue
+        fi
+
+        echo "Extracted text length: ${#text} characters"
+
+        # Generate new filename
+        new_name=$(generate_filename "$text")
+
+        if [ -z "$new_name" ]; then
+            echo "Error: Could not generate filename for $pdf_file"
+            continue
+        fi
+
+        # If auto_rename is set, rename automatically
+        if [ "$AUTO_RENAME" = true ]; then
+            mv "$pdf_file" "${new_name}.pdf"
+            echo "File automatically renamed to: ${new_name}.pdf"
+            continue
+        fi
+
+        # Ask for confirmation
+        echo "Suggested new filename: $new_name.pdf"
+        echo "Options:"
+        echo "  y - Rename file"
+        echo "  n - Keep original name"
+        echo "  a - Rename all remaining files automatically"
+        read -p "Choose an option (y/n/a): " confirm
+
+        if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
+            # Rename the file
+            mv "$pdf_file" "${new_name}.pdf"
+            echo "File renamed successfully."
+        elif [[ $confirm == [aA] ]]; then
+            # Rename the file
+            mv "$pdf_file" "${new_name}.pdf"
+            echo "File renamed successfully."
+            # Set auto_rename flag for remaining files
+            AUTO_RENAME=true
+        else
+            echo "File kept with original name."
+        fi
+    done
+
+    echo "Processing complete!"
+}
+
+# Call main with all arguments only if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

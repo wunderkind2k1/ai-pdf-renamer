@@ -31,7 +31,42 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 - `ocrmypdf`: For PDF text extraction
 - `curl`: For making API requests
 - `jq`: For JSON processing
-- `Ollama`: Running locally with the llama3.3 model
+- `Ollama`: Running locally with one of the following models:
+  - `gemma3:1b` (default): Lightweight model, good for general purpose renaming
+  - `llama3.3:latest`: More powerful model, recommended for subject-specific content
+
+### Model Selection
+
+The tool supports different Ollama models, each with its own strengths and hardware requirements:
+
+- **gemma3:1b** (default)
+  - Lightweight and fast
+  - Good for general purpose renaming
+  - Suitable for most use cases
+  - Hardware requirements:
+    - Minimal resource usage
+    - Works well on most modern systems, including laptops
+    - Suitable for systems with limited resources
+
+- **llama3.3:latest**
+  - More powerful and context-aware
+  - Better for subject-specific content
+  - Recommended for academic papers, technical documents
+  - Hardware requirements:
+    - Requires significant system resources
+    - Needs a powerful system with ample memory
+    - May not be suitable for all environments
+
+Note: Resource usage varies depending on your system configuration, model quantization, and workload. If you're unsure about your system's capabilities, start with the default gemma3:1b model.
+
+To use a different model, specify it with the `-m` or `--model` option:
+```bash
+# Use the default model (gemma3:1b)
+./process_pdfs.sh document.pdf
+
+# Use llama3.3 for better subject understanding
+./process_pdfs.sh -m llama3.3:latest document.pdf
+```
 
 ## Installation
 
@@ -46,14 +81,16 @@ The shell script version is the simplest way to get started and provides all the
    brew install ollama
    ```
 
-2. Download and set up the llama3.3 model:
+2. Download and set up the gemma3:1b model (or your preferred model):
    ```bash
    # Start Ollama service
    ollama serve
 
-   # In a new terminal, pull the llama3.3 model
-   ollama pull llama3.3:latest
+   # In a new terminal, pull the default model
+   ollama pull gemma3:1b
    ```
+
+   Note: You can use any Ollama model by specifying it with the `-m` or `--model` option.
 
 3. Make the script executable:
    ```bash
@@ -105,6 +142,7 @@ Before using the tool with automatic renaming (`-a` option), it's crucial to:
 - `-h, --help`: Show help message
 - `-a, --auto`: Automatically rename all files without confirmation (use with caution!)
 - `-p, --prompt`: Use a custom prompt for filename generation
+- `-m, --model`: Specify the Ollama model to use (default: gemma3:1b)
 
 #### Examples
 
@@ -128,24 +166,29 @@ Before using the tool with automatic renaming (`-a` option), it's crucial to:
    ./process_pdfs.sh -p "Create a filename that emphasizes the main topic and date from this text: $text" '*.pdf'
    ```
 
-5. Process files automatically (only after testing!):
+5. Process files with a different model:
+   ```bash
+   ./process_pdfs.sh -m llama3.3:latest '*.pdf'
+   ```
+
+6. Process files automatically (only after testing!):
    ```bash
    ./process_pdfs.sh -a '*.pdf'
    ```
 
-6. Process files from a list:
+7. Process files from a list:
    ```bash
    cat filelist.txt | xargs ./process_pdfs.sh
    ```
 
 ### Go Binary Usage
 
-If you're using the Go implementation, replace `./process_pdfs.sh` with `./ai-pdf-renamer` in all the examples above. The functionality and options are identical.
+If you're using the Go implementation, replace `./process_pdfs.sh` with `./ai-pdf-renamer` in all the examples above. The functionality and options are identical, including the model selection option (`-m` or `--model`).
 
 ## How it Works
 
 1. The tool processes each PDF file using OCR to extract text content
-2. The extracted text is sent to Ollama's AI model (llama3.3) to generate a meaningful filename
+2. The extracted text is sent to Ollama's AI model (gemma3:1b) to generate a meaningful filename
 3. For each file, you can:
    - Accept the suggested filename
    - Keep the original name
@@ -181,7 +224,7 @@ The Go implementation can be built in two ways:
    - macOS (amd64, arm64)
    - Windows (amd64)
 
-   The binaries will be placed in the `bin` directory with platform-specific names.
+   The binaries will be placed in the `build` directory with platform-specific names.
 
    ### Advantages of Dagger Build
    - **Cross-Platform Support**: Builds binaries for all major platforms in a single run
@@ -196,3 +239,36 @@ The Go implementation can be built in two ways:
 - Generated filenames are limited to 64 characters
 - Only alphanumeric characters and dashes are allowed in generated filenames
 - The tool will skip non-PDF files and non-existent files
+
+## Testing
+
+The project includes tests for the Go implementation:
+
+### Go Tests
+The Go implementation includes unit tests for:
+- Configuration handling
+- Default values
+- Flag parsing
+- Dagger build process
+- Build platform support
+- Output path handling
+
+Run the tests with:
+```bash
+go test -v
+```
+
+### Shell Script Testing (TODO)
+Testing for the shell script version is planned but not yet implemented. The following areas will be covered:
+- Dependency checks (ocrmypdf, curl, jq, ollama)
+- Command line argument parsing
+- Model availability checks
+- PDF processing and renaming
+- Error handling
+
+Until automated tests are implemented, manual testing is recommended:
+1. Start with a small set of test PDFs
+2. Verify all dependencies are installed
+3. Test with different models
+4. Test error cases (missing dependencies, invalid options)
+5. Test both interactive and automatic modes

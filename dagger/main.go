@@ -12,6 +12,7 @@ import (
 
 func main() {
 	ctx := context.Background()
+	failedBuilds := 0
 
 	fmt.Println("🚀 Starting Dagger build process...")
 
@@ -89,6 +90,7 @@ func main() {
 		_, err := built.File(output).Export(ctx, filepath.Join(projectRoot, output))
 		if err != nil {
 			fmt.Printf("❌ Error exporting binary for %s/%s: %v\n", platform.os, platform.arch, err)
+			failedBuilds++
 			continue
 		}
 
@@ -97,5 +99,10 @@ func main() {
 			platform.os, platform.arch, duration.Round(time.Millisecond))
 	}
 
-	fmt.Println("\n🎉 Build process completed!")
+	if failedBuilds > 0 {
+		fmt.Printf("\n❌ Build process completed with %d failed builds!\n", failedBuilds)
+		os.Exit(1)
+	}
+
+	fmt.Println("\n🎉 Build process completed successfully!")
 }

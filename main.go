@@ -164,11 +164,21 @@ func generateFilename(text string, prompt string) (string, error) {
 	return cleanName, nil
 }
 
+// getDefaultConfig returns the default configuration
+func getDefaultConfig() Config {
+	return Config{
+		AutoRename:   false,
+		CustomPrompt: defaultPrompt,
+		Model:        "gemma3:1b",
+	}
+}
+
 func main() {
-	// Parse command line flags
-	autoRename := flag.Bool("auto", false, "Automatically rename all files without confirmation")
-	customPrompt := flag.String("prompt", defaultPrompt, "Custom prompt for filename generation")
-	model := flag.String("model", "gemma3:1b", "Ollama model to use for filename generation")
+	// Initialize config with defaults
+	defaultConfig := getDefaultConfig()
+	autoRename := flag.Bool("auto", defaultConfig.AutoRename, "Automatically rename all files without confirmation")
+	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "Custom prompt for filename generation")
+	model := flag.String("model", defaultConfig.Model, "Ollama model to use for filename generation")
 	flag.Parse()
 
 	// Initialize config

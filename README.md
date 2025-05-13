@@ -31,7 +31,42 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 - `ocrmypdf`: For PDF text extraction
 - `curl`: For making API requests
 - `jq`: For JSON processing
-- `Ollama`: Running locally with the gemma3:1b model (or any other model specified)
+- `Ollama`: Running locally with one of the following models:
+  - `gemma3:1b` (default): Lightweight model, good for general purpose renaming
+  - `llama3.3:latest`: More powerful model, recommended for subject-specific content
+
+### Model Selection
+
+The tool supports different Ollama models, each with its own strengths and hardware requirements:
+
+- **gemma3:1b** (default)
+  - Lightweight and fast
+  - Good for general purpose renaming
+  - Suitable for most use cases
+  - Hardware requirements:
+    - Minimal resource usage
+    - Works well on most modern systems, including laptops
+    - Suitable for systems with limited resources
+
+- **llama3.3:latest**
+  - More powerful and context-aware
+  - Better for subject-specific content
+  - Recommended for academic papers, technical documents
+  - Hardware requirements:
+    - Requires significant system resources
+    - Needs a powerful system with ample memory
+    - May not be suitable for all environments
+
+Note: Resource usage varies depending on your system configuration, model quantization, and workload. If you're unsure about your system's capabilities, start with the default gemma3:1b model.
+
+To use a different model, specify it with the `-m` or `--model` option:
+```bash
+# Use the default model (gemma3:1b)
+./process_pdfs.sh document.pdf
+
+# Use llama3.3 for better subject understanding
+./process_pdfs.sh -m llama3.3:latest document.pdf
+```
 
 ## Installation
 

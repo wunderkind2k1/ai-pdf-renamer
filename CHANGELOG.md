@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added hardware requirements documentation for supported models
+- Added detailed model selection documentation with recommendations for gemma3:1b and llama3.3:latest
 - Added testing documentation to README (Go tests only, shell script testing TODO)
 - Added improved command line argument handling in shell script
 - Added better error messages for invalid command line options
@@ -35,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated binary export from build containers
 
 ### Changed
+- Updated model hardware requirements to provide general guidance instead of specific RAM numbers
 - Updated testing documentation to clarify shell script testing status
 - Refactored shell script to improve function organization and maintainability
 - Changed build output directory from 'bin' to 'build' for better convention

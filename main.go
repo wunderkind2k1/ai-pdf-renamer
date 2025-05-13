@@ -14,6 +14,8 @@ import (
 	"strings"
 )
 
+const defaultPrompt = "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
+
 // Config holds the application configuration
 type Config struct {
 	AutoRename   bool
@@ -111,13 +113,7 @@ func extractText(pdfFile string) (string, error) {
 }
 
 // generateFilename generates a filename using Ollama API
-func generateFilename(text string, customPrompt string) (string, error) {
-	defaultPrompt := "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text. Text: " + text
-	prompt := customPrompt
-	if prompt == "" {
-		prompt = defaultPrompt
-	}
-
+func generateFilename(text string, prompt string) (string, error) {
 	// Create the JSON payload
 	payload := map[string]interface{}{
 		"model":  config.Model,
@@ -171,7 +167,7 @@ func generateFilename(text string, customPrompt string) (string, error) {
 func main() {
 	// Parse command line flags
 	autoRename := flag.Bool("auto", false, "Automatically rename all files without confirmation")
-	customPrompt := flag.String("prompt", "", "Custom prompt for filename generation")
+	customPrompt := flag.String("prompt", defaultPrompt, "Custom prompt for filename generation")
 	model := flag.String("model", "gemma:1b", "Ollama model to use for filename generation")
 	flag.Parse()
 
@@ -230,7 +226,8 @@ func main() {
 			fmt.Printf("Extracted text length: %d characters\n", len(text))
 
 			// Generate new filename
-			newName, err := generateFilename(text, *customPrompt)
+			prompt := config.CustomPrompt + " Text: " + text
+			newName, err := generateFilename(text, prompt)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				continue

@@ -204,3 +204,36 @@ The Go implementation can be built in two ways:
 - Generated filenames are limited to 64 characters
 - Only alphanumeric characters and dashes are allowed in generated filenames
 - The tool will skip non-PDF files and non-existent files
+
+## Testing
+
+The project includes tests for the Go implementation:
+
+### Go Tests
+The Go implementation includes unit tests for:
+- Configuration handling
+- Default values
+- Flag parsing
+- Dagger build process
+- Build platform support
+- Output path handling
+
+Run the tests with:
+```bash
+go test -v
+```
+
+### Shell Script Testing (TODO)
+Testing for the shell script version is planned but not yet implemented. The following areas will be covered:
+- Dependency checks (ocrmypdf, curl, jq, ollama)
+- Command line argument parsing
+- Model availability checks
+- PDF processing and renaming
+- Error handling
+
+Until automated tests are implemented, manual testing is recommended:
+1. Start with a small set of test PDFs
+2. Verify all dependencies are installed
+3. Test with different models
+4. Test error cases (missing dependencies, invalid options)
+5. Test both interactive and automatic modes

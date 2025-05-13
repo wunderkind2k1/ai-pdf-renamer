@@ -168,7 +168,7 @@ func main() {
 	// Parse command line flags
 	autoRename := flag.Bool("auto", false, "Automatically rename all files without confirmation")
 	customPrompt := flag.String("prompt", defaultPrompt, "Custom prompt for filename generation")
-	model := flag.String("model", "gemma:1b", "Ollama model to use for filename generation")
+	model := flag.String("model", "gemma3:1b", "Ollama model to use for filename generation")
 	flag.Parse()
 
 	// Initialize config

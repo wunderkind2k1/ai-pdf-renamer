@@ -31,7 +31,7 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 - `ocrmypdf`: For PDF text extraction
 - `curl`: For making API requests
 - `jq`: For JSON processing
-- `Ollama`: Running locally with the gemma:1b model (or any other model specified)
+- `Ollama`: Running locally with the gemma3:1b model (or any other model specified)
 
 ## Installation
 
@@ -46,13 +46,13 @@ The shell script version is the simplest way to get started and provides all the
    brew install ollama
    ```
 
-2. Download and set up the gemma:1b model (or your preferred model):
+2. Download and set up the gemma3:1b model (or your preferred model):
    ```bash
    # Start Ollama service
    ollama serve
 
    # In a new terminal, pull the default model
-   ollama pull gemma:1b
+   ollama pull gemma3:1b
    ```
 
    Note: You can use any Ollama model by specifying it with the `-m` or `--model` option.
@@ -107,7 +107,7 @@ Before using the tool with automatic renaming (`-a` option), it's crucial to:
 - `-h, --help`: Show help message
 - `-a, --auto`: Automatically rename all files without confirmation (use with caution!)
 - `-p, --prompt`: Use a custom prompt for filename generation
-- `-m, --model`: Specify the Ollama model to use (default: gemma:1b)
+- `-m, --model`: Specify the Ollama model to use (default: gemma3:1b)
 
 #### Examples
 
@@ -153,7 +153,7 @@ If you're using the Go implementation, replace `./process_pdfs.sh` with `./ai-pd
 ## How it Works
 
 1. The tool processes each PDF file using OCR to extract text content
-2. The extracted text is sent to Ollama's AI model (gemma:1b) to generate a meaningful filename
+2. The extracted text is sent to Ollama's AI model (gemma3:1b) to generate a meaningful filename
 3. For each file, you can:
    - Accept the suggested filename
    - Keep the original name

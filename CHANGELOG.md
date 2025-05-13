@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated binary export from build containers
 
 ### Changed
-- Changed default model from llama3.3:latest to gemma:1b for better performance and smaller size
+- Changed default model from llama3.3:latest to gemma3:1b for better performance and smaller size
 - Updated README to include model selection documentation
 - Improved error messages and user feedback
 - Enhanced prompt handling for better filename generation

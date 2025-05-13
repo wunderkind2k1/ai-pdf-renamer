@@ -15,7 +15,7 @@ fi
 # Initialize variables
 auto_rename=false
 custom_prompt=""
-model="gemma:1b"
+model="gemma3:1b"
 
 # Display usage information
 usage() {
@@ -26,7 +26,7 @@ usage() {
     echo "  -h, --help     Show this help message"
     echo "  -a, --auto     Automatically rename all files without confirmation"
     echo "  -p, --prompt   Custom prompt for filename generation"
-    echo "  -m, --model    Ollama model to use (default: gemma:1b)"
+    echo "  -m, --model    Ollama model to use (default: gemma3:1b)"
     echo ""
     echo "Examples:"
     echo "  $0 '*.pdf'                    # Process all PDF files"

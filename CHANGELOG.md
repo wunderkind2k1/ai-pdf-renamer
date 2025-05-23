@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added vision mode as the default processing mode
+- Added `-novision` flag for OCR-only processing
+- Added automatic model switching to qwen2.5vl:7b when vision mode is enabled
+- Added comprehensive test suite for vision mode and model switching
+- Added fast mode for image-based processing using qwen2.5vl:7b model
+- Added PDF to image conversion using vips
+- Added support for vision-language model (qwen2.5vl:7b)
 - Added hardware requirements documentation for supported models
 - Added detailed model selection documentation with recommendations for gemma3:1b and llama3.3:latest
 - Added testing documentation to README (Go tests only, shell script testing TODO)
@@ -37,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated binary export from build containers
 
 ### Changed
+- Changed default processing mode to vision-based analysis
+- Changed OCR mode to be available only via `-novision` flag or as fallback
+- Updated default model to qwen2.5vl:7b for vision-based processing
+- Updated help text and documentation to reflect new default behavior
 - Updated model hardware requirements to provide general guidance instead of specific RAM numbers
 - Updated testing documentation to clarify shell script testing status
 - Refactored shell script to improve function organization and maintainability
@@ -50,11 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized command examples to use generic binary name
 
 ### Fixed
+- Fixed model switching logic to ensure correct model is used in vision mode
+- Fixed flag handling for `-novision` to properly disable vision processing
 - Potential risk of file operations when required model is not installed
 - Various shell script compatibility issues
 - Error handling for missing dependencies
 - File permission handling
 
 ### Removed
+- Removed shell script implementation in favor of Go version
+- Removed shell script testing documentation
+- Removed shell script examples from documentation
 - Docker-related components and documentation
 - Dockerfile and .dockerignore files

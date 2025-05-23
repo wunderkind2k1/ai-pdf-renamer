@@ -18,8 +18,11 @@ func TestGetDefaultConfig(t *testing.T) {
 	if config.CustomPrompt != defaultPrompt {
 		t.Errorf("Default CustomPrompt = %q, want %q", config.CustomPrompt, defaultPrompt)
 	}
-	if config.Model != "gemma3:1b" {
-		t.Errorf("Default Model = %q, want gemma3:1b", config.Model)
+	if config.Model != "qwen2.5vl:7b" {
+		t.Errorf("Default Model = %q, want qwen2.5vl:7b", config.Model)
+	}
+	if config.FastMode != true {
+		t.Errorf("Default FastMode = %v, want true", config.FastMode)
 	}
 }
 
@@ -34,21 +37,24 @@ func TestFlagParsing(t *testing.T) {
 	autoRename := flag.Bool("auto", defaultConfig.AutoRename, "")
 	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "")
 	model := flag.String("model", defaultConfig.Model, "")
+	noVision := flag.Bool("novision", false, "")
 
 	// Test with custom values
-	os.Args = []string{"test", "-auto", "-prompt", "custom prompt", "-model", "llama2"}
+	os.Args = []string{"test", "-auto", "-prompt", "custom prompt", "-model", "llama2", "-novision"}
 	flag.Parse()
 
 	got := Config{
 		AutoRename:   *autoRename,
 		CustomPrompt: *customPrompt,
 		Model:        *model,
+		FastMode:     !*noVision, // Invert novision flag to get FastMode
 	}
 
 	want := Config{
 		AutoRename:   true,
 		CustomPrompt: "custom prompt",
 		Model:        "llama2",
+		FastMode:     false, // novision flag is true, so FastMode should be false
 	}
 
 	if got != want {
@@ -96,10 +102,12 @@ func TestUsageDisplay(t *testing.T) {
 		"-auto",
 		"-prompt",
 		"-model",
+		"-novision",
 		"Examples:",
 		"*.pdf",
 		"file1.pdf file2.pdf",
 		"custom prompt",
+		"Vision-based processing is enabled by default",
 	}
 
 	for _, element := range expectedElements {
@@ -116,6 +124,7 @@ func TestDependencyMessages(t *testing.T) {
 		"curl":     "curl is not installed",
 		"jq":       "jq is not installed",
 		"ollama":   "ollama is not installed",
+		"gs":       "gs is not installed",
 	}
 
 	for dep, expectedMsg := range expectedMessages {
@@ -147,5 +156,46 @@ func TestDependencyMessages(t *testing.T) {
 				t.Errorf("Error message for %s = %q, want message containing %q", dep, err.Error(), expectedMsg)
 			}
 		})
+	}
+}
+
+func TestModelSwitching(t *testing.T) {
+	// Test that model is automatically switched to qwen2.5vl:7b when vision mode is enabled
+	config = Config{
+		Model:    "llama2",
+		FastMode: true,
+	}
+
+	// Initialize config with defaults
+	defaultConfig := getDefaultConfig()
+	model := flag.String("model", defaultConfig.Model, "")
+	noVision := flag.Bool("novision", false, "")
+
+	// Test with vision mode enabled (default)
+	os.Args = []string{"test", "-model", "llama2"}
+	flag.Parse()
+
+	config = Config{
+		Model:    *model,
+		FastMode: !*noVision,
+	}
+
+	// Model should be switched to qwen2.5vl:7b
+	if config.Model != "qwen2.5vl:7b" {
+		t.Errorf("Model not switched to qwen2.5vl:7b in vision mode, got %q", config.Model)
+	}
+
+	// Test with vision mode disabled
+	os.Args = []string{"test", "-model", "llama2", "-novision"}
+	flag.Parse()
+
+	config = Config{
+		Model:    *model,
+		FastMode: !*noVision,
+	}
+
+	// Model should remain as llama2
+	if config.Model != "llama2" {
+		t.Errorf("Model incorrectly switched in OCR mode, got %q", config.Model)
 	}
 }

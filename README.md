@@ -28,7 +28,7 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 
 ## Requirements
 
-- `ocrmypdf`: For PDF text extraction
+- `ocrmypdf`: Required for PDF text extraction (mandatory dependency)
 - `curl`: For making API requests
 - `jq`: For JSON processing
 - `Ollama`: Running locally with one of the following models:
@@ -57,6 +57,15 @@ The tool supports different Ollama models, each with its own strengths and hardw
     - Needs a powerful system with ample memory
     - May not be suitable for all environments
 
+- **qwen2.5vl:7b** (for fast mode)
+  - Vision-language model capable of understanding images
+  - Used in fast mode for image-based processing
+  - Faster processing by avoiding OCR
+  - Hardware requirements:
+    - Requires significant system resources
+    - Needs a powerful system with ample memory
+    - GPU acceleration recommended
+
 Note: Resource usage varies depending on your system configuration, model quantization, and workload. If you're unsure about your system's capabilities, start with the default gemma3:1b model.
 
 To use a different model, specify it with the `-m` or `--model` option:
@@ -66,7 +75,29 @@ To use a different model, specify it with the `-m` or `--model` option:
 
 # Use llama3.3 for better subject understanding
 ./process_pdfs.sh -m llama3.3:latest document.pdf
+
+# Use fast mode with qwen2.5vl:7b for image-based processing
+./process_pdfs.sh -fast document.pdf
 ```
+
+### Fast Mode
+
+The tool now supports a fast mode that uses image-based processing instead of OCR. This mode:
+- Converts PDFs to images using vips
+- Uses the qwen2.5vl:7b model to analyze images directly
+- Avoids the time-consuming OCR process
+- May provide better results for documents with complex layouts or images
+
+To use fast mode:
+```bash
+# Enable fast mode
+./process_pdfs.sh -fast document.pdf
+
+# Fast mode with custom prompt
+./process_pdfs.sh -fast -p "Create a filename based on this image content" document.pdf
+```
+
+Note: Fast mode requires the qwen2.5vl:7b model to be installed. The tool will automatically switch to this model when fast mode is enabled.
 
 ## Installation
 

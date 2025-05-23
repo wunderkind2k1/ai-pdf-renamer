@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added fast mode for image-based processing using qwen2.5vl:7b model
+- Added PDF to image conversion using vips
+- Added support for vision-language model (qwen2.5vl:7b)
 - Added hardware requirements documentation for supported models
 - Added detailed model selection documentation with recommendations for gemma3:1b and llama3.3:latest
 - Added testing documentation to README (Go tests only, shell script testing TODO)

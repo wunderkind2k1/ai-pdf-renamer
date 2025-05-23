@@ -18,6 +18,16 @@ jobs:
         with:
           go-version: '1.22'
 
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ocrmypdf curl jq ghostscript
+          curl -fsSL https://ollama.com/install.sh | sh
+          sudo systemctl start ollama
+          # Pull required models
+          ollama pull qwen2.5vl:7b
+          ollama pull llama2
+
       - name: Install Dagger
         run: |
           curl -L https://dl.dagger.io/dagger/install.sh | sh

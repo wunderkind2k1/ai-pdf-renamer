@@ -325,9 +325,9 @@ func getDefaultConfig() Config {
 	return Config{
 		AutoRename:   false,
 		CustomPrompt: defaultPrompt,
-		Model:        "gemma3:1b",
-		FastMode:     false,
-		OutputDir:    "", // Empty string means use the same directory as input
+		Model:        "qwen2.5vl:7b", // Default to vision model
+		FastMode:     true,           // Default to vision mode
+		OutputDir:    "",             // Empty string means use the same directory as input
 	}
 }
 
@@ -423,21 +423,21 @@ func processPDF(pdfFile string) error {
 	fmt.Printf("Processing: %s\n", pdfFile)
 
 	if config.FastMode {
-		// Try fast mode (image extraction) first
+		// Try vision-based processing first
 		images, err := extractPDFPages(pdfFile)
 		if err != nil {
-			fmt.Printf("Error (fast mode) extracting PDF pages: %v\n", err)
+			fmt.Printf("Error (vision mode) extracting PDF pages: %v\n", err)
 			return fallbackToOCR(pdfFile)
 		}
 		// Use image-based processing (generateFilenameFast) with all extracted pages
 		prompt := config.CustomPrompt + " Analyze these images and create a filename based on their content."
 		newName, err := generateFilenameFast(images, prompt)
 		if err != nil {
-			fmt.Printf("Error (fast mode) generating filename (generateFilenameFast): %v\n", err)
+			fmt.Printf("Error (vision mode) generating filename (generateFilenameFast): %v\n", err)
 			return fallbackToOCR(pdfFile)
 		}
 		if !config.AutoRename {
-			fmt.Printf("Suggested new filename (fast mode): %s.pdf\n", newName)
+			fmt.Printf("Suggested new filename (vision mode): %s.pdf\n", newName)
 			fmt.Println("Options:")
 			fmt.Println("  y – Rename file")
 			fmt.Println("  n – Keep original name")
@@ -447,14 +447,14 @@ func processPDF(pdfFile string) error {
 			if confirm == "a" {
 				config.AutoRename = true
 			} else if confirm != "y" {
-				fmt.Println("File kept with original name (fast mode).")
+				fmt.Println("File kept with original name (vision mode).")
 				return nil
 			}
 		}
 		_, err = writeOutputFile(pdfFile, newName)
 		return err
 	} else {
-		// Original OCR mode (using ocrmypdf)
+		// OCR-only mode
 		text, err := extractText(pdfFile)
 		if err != nil {
 			fmt.Printf("Error (OCR mode) extractText: %v\n", err)
@@ -493,7 +493,7 @@ func main() {
 	autoRename := flag.Bool("auto", defaultConfig.AutoRename, "Automatically rename all files without confirmation")
 	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "Custom prompt for filename generation")
 	model := flag.String("model", defaultConfig.Model, "Ollama model to use for filename generation")
-	fastMode := flag.Bool("fast", defaultConfig.FastMode, "Enable fast mode with image-based processing (no value needed, just use -fast)")
+	noVision := flag.Bool("novision", false, "Disable vision-based processing and use OCR only")
 	outputDir := flag.String("output", "", "Output directory for renamed files (default: same as input)")
 
 	// Custom usage function to provide clearer help
@@ -502,10 +502,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nOptions:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s -fast -output renamed/ *.pdf     # Enable fast mode (no value needed)\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -auto *.pdf                      # Process all PDFs automatically\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -model llama3.3:latest *.pdf     # Use a different model\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\nNote: The -fast flag is a switch and doesn't take a value. Just use -fast to enable it.\n")
+		fmt.Fprintf(os.Stderr, "  %s -output renamed/ *.pdf     # Use vision-based processing (default)\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -novision *.pdf            # Use OCR-only mode\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -auto *.pdf                # Process all PDFs automatically\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -model llama3.3:latest *.pdf # Use a different model\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nNote: Vision-based processing is enabled by default. Use -novision to disable it and use OCR only.\n")
 	}
 
 	flag.Parse()
@@ -513,8 +514,8 @@ func main() {
 	// Check for common flag usage errors
 	args := flag.Args()
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "-fast=") {
-			fmt.Fprintf(os.Stderr, "Error: -fast is a switch flag and doesn't take a value. Use just -fast instead of -fast=%s\n", strings.TrimPrefix(arg, "-fast="))
+		if strings.HasPrefix(arg, "-novision=") {
+			fmt.Fprintf(os.Stderr, "Error: -novision is a switch flag and doesn't take a value. Use just -novision instead of -novision=%s\n", strings.TrimPrefix(arg, "-novision="))
 			os.Exit(1)
 		}
 	}
@@ -533,12 +534,13 @@ func main() {
 		AutoRename:   *autoRename,
 		CustomPrompt: *customPrompt,
 		Model:        *model,
-		FastMode:     *fastMode,
+		FastMode:     !*noVision, // Invert the novision flag to get FastMode
 		OutputDir:    outputDirPath,
 	}
 
-	// If fast mode is enabled, use qwen2.5vl:7b model
-	if config.FastMode {
+	// If vision mode is enabled (default), ensure we're using the vision model
+	if config.FastMode && config.Model != "qwen2.5vl:7b" {
+		fmt.Printf("Note: Switching to qwen2.5vl:7b model for vision-based processing\n")
 		config.Model = "qwen2.5vl:7b"
 	}
 

@@ -22,9 +22,7 @@ jobs:
         run: |
           go test -v -coverprofile=coverage.out -covermode=atomic ./...
           go tool cover -func=coverage.out > coverage.txt
-          # Generate coverage report in a format GitHub can display
           go tool cover -html=coverage.out -o coverage.html
-          # Create a summary file that GitHub can parse
           echo "::group::Coverage Report" >> $GITHUB_STEP_SUMMARY
           cat coverage.txt >> $GITHUB_STEP_SUMMARY
           echo "::endgroup::" >> $GITHUB_STEP_SUMMARY

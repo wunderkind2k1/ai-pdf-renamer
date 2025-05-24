@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       version:
-        description: 'Version to release (e.g., 0.0.1)'
+        description: 'Version to release (e.g., v0.0.1)'
         required: true
         type: string
       release_notes:
@@ -33,8 +33,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          name: Release v${{ github.event.inputs.version }}
-          tag_name: v${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          tag_name: ${{ github.event.inputs.version }}
           body: ${{ github.event.inputs.release_notes }}
           files: build/**
           generate_release_notes: ${{ !github.event.inputs.release_notes }}

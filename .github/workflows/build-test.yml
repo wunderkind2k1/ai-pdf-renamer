@@ -30,8 +30,9 @@ jobs:
 
       - name: Install Dagger
         run: |
-          curl -L https://dl.dagger.io/dagger/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          curl -L https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.9.3 sh
+          export PATH="$HOME/.local/bin:$PATH"
+          dagger version
 
       - name: Run Tests with Coverage
         run: |
@@ -66,11 +67,14 @@ jobs:
 
       - name: Install Dagger
         run: |
-          curl -L https://dl.dagger.io/dagger/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          curl -L https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.9.3 sh
+          export PATH="$HOME/.local/bin:$PATH"
+          dagger version
 
       - name: Build with Dagger
-        run: dagger run go run ./cmd/build/main.go
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          dagger run go run ./cmd/build/main.go
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

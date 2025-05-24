@@ -48,7 +48,7 @@ jobs:
           git push origin ${{ github.event.inputs.version }}
 
       - name: Download Build Artifacts
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v6
         with:
           workflow: build-test.yml
           run_id: ${{ github.event.inputs.workflow_run_id }}

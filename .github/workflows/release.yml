@@ -3,12 +3,12 @@ name: Create Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (e.g., 1.0.0)'
+      workflow_run_id:
+        description: 'ID of the successful build workflow run to use (required)'
         required: true
         type: string
-      release_notes:
-        description: 'Release notes'
+      version:
+        description: 'Version to release (e.g., 0.0.1)'
         required: true
         type: string
 
@@ -17,25 +17,21 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v3
         with:
+          workflow: build-test.yml
+          run_id: ${{ github.event.inputs.workflow_run_id }}
           name: build-artifacts
           path: build/
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          name: Release ${{ github.event.inputs.version }}
-          body: ${{ github.event.inputs.release_notes }}
-          draft: false
-          prerelease: false
-          files: |
-            build/*
+          name: Release v${{ github.event.inputs.version }}
+          tag_name: v${{ github.event.inputs.version }}
+          files: build/**
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

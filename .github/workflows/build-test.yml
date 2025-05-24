@@ -22,7 +22,12 @@ jobs:
         run: |
           go test -v -coverprofile=coverage.out -covermode=atomic ./...
           go tool cover -func=coverage.out > coverage.txt
+          # Generate coverage report in a format GitHub can display
           go tool cover -html=coverage.out -o coverage.html
+          # Create a summary file that GitHub can parse
+          echo "::group::Coverage Report" >> $GITHUB_STEP_SUMMARY
+          cat coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo "::endgroup::" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
@@ -36,6 +41,21 @@ jobs:
 
       - name: Display Coverage Summary
         run: cat coverage.txt
+
+      - name: Publish Coverage Report
+        uses: actions/github-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          files: coverage.html
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     name: Build Application

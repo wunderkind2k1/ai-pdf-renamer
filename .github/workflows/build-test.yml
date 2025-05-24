@@ -49,13 +49,13 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Setup Dagger
-        uses: dagger/setup-action@v3
-
       - name: Build with Dagger
-        run: |
-          cd dagger
-          dagger run go run main.go
+        uses: dagger/dagger-for-github@8.0.0
+        with:
+          version: "latest"
+          verb: run
+          workdir: dagger
+          args: go run main.go
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

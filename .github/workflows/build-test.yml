@@ -47,18 +47,17 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
 
       - name: Install Dagger
         run: |
-          curl -L https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.9.3 sh
-          export PATH="$HOME/.local/bin:$PATH"
-          dagger version
+          curl -L https://dl.dagger.io/dagger/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          $HOME/.local/bin/dagger version
 
       - name: Build with Dagger
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          dagger run go run ./cmd/build/main.go
+          $HOME/.local/bin/dagger run go run ./cmd/build/main.go
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

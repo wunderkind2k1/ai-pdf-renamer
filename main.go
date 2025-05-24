@@ -17,6 +17,18 @@ import (
 	"strings"
 )
 
+// Exitor defines the interface for program exit behavior
+type Exitor interface {
+	Exit(code int)
+}
+
+// DefaultExitor implements Exitor using os.Exit
+type DefaultExitor struct{}
+
+func (e *DefaultExitor) Exit(code int) {
+	os.Exit(code)
+}
+
 const defaultPrompt = "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
 
 // Config holds the application configuration
@@ -26,6 +38,7 @@ type Config struct {
 	Model        string
 	FastMode     bool
 	OutputDir    string // New field for output directory
+	Exitor       Exitor // Interface for program exit behavior
 }
 
 // Global config variable
@@ -325,9 +338,10 @@ func getDefaultConfig() Config {
 	return Config{
 		AutoRename:   false,
 		CustomPrompt: defaultPrompt,
-		Model:        "qwen2.5vl:7b", // Default to vision model
-		FastMode:     true,           // Default to vision mode
-		OutputDir:    "",             // Empty string means use the same directory as input
+		Model:        "qwen2.5vl:7b",   // Default to vision model
+		FastMode:     true,             // Default to vision mode
+		OutputDir:    "",               // Empty string means use the same directory as input
+		Exitor:       &DefaultExitor{}, // Default exitor implementation
 	}
 }
 
@@ -487,67 +501,39 @@ func processPDF(pdfFile string) error {
 	}
 }
 
-func main() {
-	// Initialize config with defaults
-	defaultConfig := getDefaultConfig()
-	autoRename := flag.Bool("auto", defaultConfig.AutoRename, "Automatically rename all files without confirmation")
-	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "Custom prompt for filename generation")
-	model := flag.String("model", defaultConfig.Model, "Ollama model to use for filename generation")
-	noVision := flag.Bool("novision", false, "Disable vision-based processing and use OCR only")
-	outputDir := flag.String("output", "", "Output directory for renamed files (default: same as input)")
-
-	// Custom usage function to provide clearer help
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\nOptions:\n")
-		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s -output renamed/ *.pdf     # Use vision-based processing (default)\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -novision *.pdf            # Use OCR-only mode\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -auto *.pdf                # Process all PDFs automatically\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -model llama3.3:latest *.pdf # Use a different model\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\nNote: Vision-based processing is enabled by default. Use -novision to disable it and use OCR only.\n")
-	}
-
-	flag.Parse()
-
+func setup(cfg Config) {
 	// Check for common flag usage errors
 	args := flag.Args()
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-novision=") {
 			fmt.Fprintf(os.Stderr, "Error: -novision is a switch flag and doesn't take a value. Use just -novision instead of -novision=%s\n", strings.TrimPrefix(arg, "-novision="))
-			os.Exit(1)
+			cfg.Exitor.Exit(1)
 		}
 	}
 
 	// Clean up output directory path and ensure it's set
-	outputDirPath := *outputDir
+	outputDirPath := cfg.OutputDir
 	if outputDirPath != "" {
 		// Clean and normalize the path
 		outputDirPath = filepath.Clean(outputDirPath)
 		// Remove trailing slash if present
 		outputDirPath = strings.TrimSuffix(outputDirPath, string(os.PathSeparator))
-	}
-
-	// Initialize config
-	config = Config{
-		AutoRename:   *autoRename,
-		CustomPrompt: *customPrompt,
-		Model:        *model,
-		FastMode:     !*noVision, // Invert the novision flag to get FastMode
-		OutputDir:    outputDirPath,
+		cfg.OutputDir = outputDirPath
 	}
 
 	// If vision mode is enabled (default), ensure we're using the vision model
-	if config.FastMode && config.Model != "qwen2.5vl:7b" {
+	if cfg.FastMode && cfg.Model != "qwen2.5vl:7b" {
 		fmt.Printf("Note: Switching to qwen2.5vl:7b model for vision-based processing\n")
-		config.Model = "qwen2.5vl:7b"
+		cfg.Model = "qwen2.5vl:7b"
 	}
+
+	// Set global config for downstream functions
+	config = cfg
 
 	// Check dependencies
 	if err := checkDependencies(); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		cfg.Exitor.Exit(1)
 	}
 
 	// Get file patterns from arguments
@@ -563,7 +549,7 @@ func main() {
 		fmt.Println("  ai-pdf-renamer -output renamed/ *.pdf     # Save renamed files to 'renamed' directory")
 		fmt.Println("  cat filelist.txt | xargs ai-pdf-renamer   # Process files listed in filelist.txt")
 		fmt.Println("  ai-pdf-renamer -p 'custom prompt' *.pdf   # Use custom prompt for filename generation")
-		os.Exit(1)
+		cfg.Exitor.Exit(1)
 	}
 
 	// Process each file pattern
@@ -589,4 +575,41 @@ func main() {
 	}
 
 	fmt.Println("Processing complete!")
+}
+
+func main() {
+	// Initialize config with defaults
+	defaultConfig := getDefaultConfig()
+	autoRename := flag.Bool("auto", defaultConfig.AutoRename, "Automatically rename all files without confirmation")
+	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "Custom prompt for filename generation")
+	model := flag.String("model", defaultConfig.Model, "Ollama model to use for filename generation")
+	noVision := flag.Bool("novision", false, "Disable vision-based processing and use OCR only")
+	outputDir := flag.String("output", "", "Output directory for renamed files (default: same as input)")
+
+	// Custom usage function to provide clearer help
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nOptions:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  %s -output renamed/ *.pdf     # Use vision-based processing (default)\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -novision *.pdf            # Use OCR-only mode\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -auto *.pdf                # Process all PDFs automatically\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -model llama3.3:latest *.pdf # Use a different model\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nNote: Vision-based processing is enabled by default. Use -novision to disable it and use OCR only.\n")
+	}
+
+	flag.Parse()
+
+	// Build config from flags
+	cfg := Config{
+		AutoRename:   *autoRename,
+		CustomPrompt: *customPrompt,
+		Model:        *model,
+		FastMode:     !*noVision, // Invert the novision flag to get FastMode
+		OutputDir:    *outputDir,
+		Exitor:       &DefaultExitor{},
+	}
+
+	setup(cfg)
 }

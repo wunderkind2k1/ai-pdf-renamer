@@ -49,15 +49,13 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Install Dagger
-        run: |
-          curl -L https://dl.dagger.io/dagger/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          $HOME/.local/bin/dagger version
+      - name: Setup Dagger
+        uses: dagger/setup-action@v3
 
       - name: Build with Dagger
         run: |
-          $HOME/.local/bin/dagger run go run ./cmd/build/main.go
+          cd dagger
+          dagger run go run main.go
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

@@ -40,21 +40,6 @@ jobs:
       - name: Display Coverage Summary
         run: cat coverage.txt
 
-      - name: Publish Coverage Report
-        uses: actions/github-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          publish_branch: gh-pages
-          files: coverage.html
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   build:
     name: Build Application
     needs: test

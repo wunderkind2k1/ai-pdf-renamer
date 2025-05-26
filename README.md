@@ -75,7 +75,11 @@ The tool supports different Ollama models, each with its own strengths and hardw
 
 Note: Resource usage varies depending on your system configuration, model quantization, and workload. If you're unsure about your system's capabilities, start with fast mode using qwen2.5vl:7b.
 
-## Installation
+## How to get it
+
+Download the app from the current release at https://github.com/wunderkind2k1/ai-pdf-renamer/releases
+
+## Manual build/ Installation
 
 1. Install Go (version 1.21 or later)
 2. Install required dependencies:

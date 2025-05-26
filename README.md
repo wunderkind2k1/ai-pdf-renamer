@@ -16,6 +16,9 @@ Manually renaming downloaded or scanned PDFs — like research papers, invoices,
 - **Professionals**: Organize invoices, contracts, and reports without having to open and scan each document manually
 - **Anyone with a messy Downloads folder**: Bring order to chaos by turning vague file names into descriptive ones
 
+### Demo
+https://github.com/user-attachments/assets/71ce7d57-f75c-4660-ba80-56207e14880d
+
 ## Features
 
 - Two processing modes:
@@ -102,13 +105,6 @@ Note: Resource usage varies depending on your system configuration, model quanti
    ```
 
 ## Usage
-
-### Demo
-
-
-https://github.com/user-attachments/assets/71ce7d57-f75c-4660-ba80-56207e14880d
-
-
 
 ### ⚠️ Important Security Note
 

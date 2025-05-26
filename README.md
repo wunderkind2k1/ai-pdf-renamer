@@ -103,6 +103,13 @@ Note: Resource usage varies depending on your system configuration, model quanti
 
 ## Usage
 
+### Demo
+
+
+https://github.com/user-attachments/assets/71ce7d57-f75c-4660-ba80-56207e14880d
+
+
+
 ### ⚠️ Important Security Note
 
 Before using the tool with automatic renaming (`-auto` option), it's crucial to:

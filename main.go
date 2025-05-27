@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -54,6 +55,11 @@ type OllamaResponse struct {
 func checkDependencies() error {
 	deps := []string{"curl", "jq", "ollama", "gs", "ocrmypdf"} // Always include ocrmypdf
 	for _, dep := range deps {
+		if runtime.GOOS == "windows" {
+			// On Windows, append .exe if necessary
+			dep = dep + ".exe"
+		}
+
 		if _, err := exec.LookPath(dep); err != nil {
 			return fmt.Errorf("error: %s is not installed. Please install it first", dep)
 		}

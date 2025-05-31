@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -30,6 +31,7 @@ func (e *DefaultExitor) Exit(code int) {
 }
 
 const defaultPrompt = "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
+const winErrPre = "On windows dependencies might be tricky. We recommend using a package manager like chocolatey, winget or similar\n\n"
 
 // Config holds the application configuration
 type Config struct {
@@ -54,8 +56,17 @@ type OllamaResponse struct {
 func checkDependencies() error {
 	deps := []string{"curl", "jq", "ollama", "gs", "ocrmypdf"} // Always include ocrmypdf
 	for _, dep := range deps {
+		if runtime.GOOS == "windows" {
+			// On Windows, append .exe if necessary
+			dep = dep + ".exe"
+		}
+
 		if _, err := exec.LookPath(dep); err != nil {
-			return fmt.Errorf("error: %s is not installed. Please install it first", dep)
+			depErrMsg := "error: %s is not installed. Please install it first"
+			if runtime.GOOS == "windows" {
+				depErrMsg = winErrPre + depErrMsg
+			}
+			return fmt.Errorf(depErrMsg, dep)
 		}
 	}
 

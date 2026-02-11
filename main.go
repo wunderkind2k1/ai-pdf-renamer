@@ -30,7 +30,7 @@ func (e *DefaultExitor) Exit(code int) {
 	os.Exit(code)
 }
 
-const defaultPrompt = "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
+const defaultPromptTemplate = "Extract the most important keywords from this text and create a filename. The filename should be concise (max %d chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
 const winErrPre = "On windows dependencies might be tricky. We recommend using a package manager like chocolatey, winget or similar\n\n"
 
 // Config holds the application configuration
@@ -40,6 +40,7 @@ type Config struct {
 	Model        string
 	FastMode     bool
 	OutputDir    string // New field for output directory
+	MaxChars     int    // Maximum character length for generated filenames
 	Exitor       Exitor // Interface for program exit behavior
 }
 
@@ -270,8 +271,8 @@ func generateFilename(text string, prompt string) (string, error) {
 	cleanName = strings.Trim(cleanName, "-")
 
 	// Ensure the name is not too long
-	if len(cleanName) > 64 {
-		cleanName = cleanName[:64]
+	if len(cleanName) > config.MaxChars {
+		cleanName = cleanName[:config.MaxChars]
 	}
 
 	return cleanName, nil
@@ -337,8 +338,8 @@ func generateFilenameFast(images [][]byte, prompt string) (string, error) {
 	cleanName = strings.Trim(cleanName, "-")
 
 	// Ensure the name is not too long
-	if len(cleanName) > 64 {
-		cleanName = cleanName[:64]
+	if len(cleanName) > config.MaxChars {
+		cleanName = cleanName[:config.MaxChars]
 	}
 
 	return cleanName, nil
@@ -348,10 +349,11 @@ func generateFilenameFast(images [][]byte, prompt string) (string, error) {
 func getDefaultConfig() Config {
 	return Config{
 		AutoRename:   false,
-		CustomPrompt: defaultPrompt,
+		CustomPrompt: "",
 		Model:        "qwen2.5vl:7b",   // Default to vision model
 		FastMode:     true,             // Default to vision mode
 		OutputDir:    "",               // Empty string means use the same directory as input
+		MaxChars:     64,               // Default max filename length
 		Exitor:       &DefaultExitor{}, // Default exitor implementation
 	}
 }
@@ -532,6 +534,11 @@ func setup(cfg Config) {
 		cfg.OutputDir = outputDirPath
 	}
 
+	// Generate default prompt from template if no custom prompt was provided
+	if cfg.CustomPrompt == "" {
+		cfg.CustomPrompt = fmt.Sprintf(defaultPromptTemplate, cfg.MaxChars)
+	}
+
 	// If vision mode is enabled (default), ensure we're using the vision model
 	if cfg.FastMode && cfg.Model != "qwen2.5vl:7b" {
 		fmt.Printf("Note: Switching to qwen2.5vl:7b model for vision-based processing\n")
@@ -592,10 +599,11 @@ func main() {
 	// Initialize config with defaults
 	defaultConfig := getDefaultConfig()
 	autoRename := flag.Bool("auto", defaultConfig.AutoRename, "Automatically rename all files without confirmation")
-	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "Custom prompt for filename generation")
+	customPrompt := flag.String("prompt", "", "Custom prompt for filename generation")
 	model := flag.String("model", defaultConfig.Model, "Ollama model to use for filename generation")
 	noVision := flag.Bool("novision", false, "Disable vision-based processing and use OCR only")
 	outputDir := flag.String("output", "", "Output directory for renamed files (default: same as input)")
+	maxChars := flag.Int("maxchars", defaultConfig.MaxChars, "Maximum character length for generated filenames")
 
 	// Custom usage function to provide clearer help
 	flag.Usage = func() {
@@ -607,18 +615,26 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  %s -novision *.pdf            # Use OCR-only mode\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -auto *.pdf                # Process all PDFs automatically\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -model llama3.3:latest *.pdf # Use a different model\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -maxchars 64 *.pdf           # Limit filenames to 64 characters\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nNote: Vision-based processing is enabled by default. Use -novision to disable it and use OCR only.\n")
 	}
 
 	flag.Parse()
 
+	// Build the prompt: use custom if provided, otherwise generate from template with maxchars
+	prompt := *customPrompt
+	if prompt == "" {
+		prompt = fmt.Sprintf(defaultPromptTemplate, *maxChars)
+	}
+
 	// Build config from flags
 	cfg := Config{
 		AutoRename:   *autoRename,
-		CustomPrompt: *customPrompt,
+		CustomPrompt: prompt,
 		Model:        *model,
 		FastMode:     !*noVision, // Invert the novision flag to get FastMode
 		OutputDir:    *outputDir,
+		MaxChars:     *maxChars,
 		Exitor:       &DefaultExitor{},
 	}
 

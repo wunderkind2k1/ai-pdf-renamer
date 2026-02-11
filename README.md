@@ -131,6 +131,7 @@ Before using the tool with automatic renaming (`-auto` option), it's crucial to:
 - `-model`: Specify the Ollama model to use (default: qwen2.5vl:7b)
 - `-novision`: Disable vision-based processing and use OCR only
 - `-output`: Specify output directory for renamed files
+- `-maxchars`: Maximum character length for generated filenames (default: 64)
 
 #### Examples
 
@@ -164,7 +165,12 @@ Before using the tool with automatic renaming (`-auto` option), it's crucial to:
    ./ai-pdf-renamer -auto '*.pdf'
    ```
 
-7. Process files from a list:
+7. Allow longer filenames (up to 128 characters):
+   ```bash
+   ./ai-pdf-renamer -maxchars 128 '*.pdf'
+   ```
+
+8. Process files from a list:
    ```bash
    cat filelist.txt | xargs ./ai-pdf-renamer
    ```
@@ -212,7 +218,7 @@ You can override this using the `-prompt` option.
 ## Notes
 
 - The tool requires Ollama to be running locally on port 11434
-- Generated filenames are limited to 64 characters
+- Generated filenames are limited to 64 characters by default (configurable via `-maxchars`)
 - Only alphanumeric characters and dashes are allowed in generated filenames
 - The tool will skip non-PDF files and non-existent files
 - Fast mode requires the qwen2.5vl:7b model to be installed

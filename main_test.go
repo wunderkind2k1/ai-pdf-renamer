@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,10 +40,18 @@ func TestDefaultConfig(t *testing.T) {
 		{
 			name: "CustomPrompt default",
 			check: func(c Config) bool {
-				return c.CustomPrompt == defaultPrompt
+				return c.CustomPrompt == ""
 			},
 			expected: true,
-			message:  "Default CustomPrompt should match defaultPrompt",
+			message:  "Default CustomPrompt should be empty (generated from template at runtime)",
+		},
+		{
+			name: "MaxChars default",
+			check: func(c Config) bool {
+				return c.MaxChars == 64
+			},
+			expected: true,
+			message:  "Default MaxChars should be 64",
 		},
 		{
 			name: "Model default",
@@ -74,6 +83,8 @@ func TestDefaultConfig(t *testing.T) {
 
 // TestFlagParsing verifies that command line flags are correctly parsed
 func TestFlagParsing(t *testing.T) {
+	defaultPrompt64 := fmt.Sprintf(defaultPromptTemplate, 64)
+
 	tests := []struct {
 		name     string
 		args     []string
@@ -81,12 +92,13 @@ func TestFlagParsing(t *testing.T) {
 	}{
 		{
 			name: "All flags set",
-			args: []string{"test", "-auto", "-prompt", "custom prompt", "-model", "llama2", "-novision"},
+			args: []string{"test", "-auto", "-prompt", "custom prompt", "-model", "llama2", "-novision", "-maxchars", "64"},
 			expected: Config{
 				AutoRename:   true,
 				CustomPrompt: "custom prompt",
 				Model:        "llama2",
 				FastMode:     false,
+				MaxChars:     64,
 			},
 		},
 		{
@@ -94,9 +106,10 @@ func TestFlagParsing(t *testing.T) {
 			args: []string{"test"},
 			expected: Config{
 				AutoRename:   false,
-				CustomPrompt: defaultPrompt,
+				CustomPrompt: defaultPrompt64,
 				Model:        "qwen2.5vl:7b",
 				FastMode:     true,
+				MaxChars:     64,
 			},
 		},
 		{
@@ -104,9 +117,21 @@ func TestFlagParsing(t *testing.T) {
 			args: []string{"test", "-auto"},
 			expected: Config{
 				AutoRename:   true,
-				CustomPrompt: defaultPrompt,
+				CustomPrompt: defaultPrompt64,
 				Model:        "qwen2.5vl:7b",
 				FastMode:     true,
+				MaxChars:     64,
+			},
+		},
+		{
+			name: "Custom maxchars updates prompt",
+			args: []string{"test", "-maxchars", "64"},
+			expected: Config{
+				AutoRename:   false,
+				CustomPrompt: fmt.Sprintf(defaultPromptTemplate, 64),
+				Model:        "qwen2.5vl:7b",
+				FastMode:     true,
+				MaxChars:     64,
 			},
 		},
 	}
@@ -121,19 +146,27 @@ func TestFlagParsing(t *testing.T) {
 			flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 			defaultConfig := getDefaultConfig()
 			autoRename := flag.Bool("auto", defaultConfig.AutoRename, "")
-			customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "")
+			customPrompt := flag.String("prompt", "", "")
 			model := flag.String("model", defaultConfig.Model, "")
 			noVision := flag.Bool("novision", false, "")
+			maxChars := flag.Int("maxchars", defaultConfig.MaxChars, "")
 
 			// Set test args and parse
 			os.Args = tt.args
 			flag.Parse()
 
+			// Build the prompt the same way main() does
+			prompt := *customPrompt
+			if prompt == "" {
+				prompt = fmt.Sprintf(defaultPromptTemplate, *maxChars)
+			}
+
 			got := Config{
 				AutoRename:   *autoRename,
-				CustomPrompt: *customPrompt,
+				CustomPrompt: prompt,
 				Model:        *model,
 				FastMode:     !*noVision,
+				MaxChars:     *maxChars,
 			}
 
 			if got != tt.expected {

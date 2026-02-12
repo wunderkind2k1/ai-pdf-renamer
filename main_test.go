@@ -82,7 +82,7 @@ func TestFlagParsing(t *testing.T) {
 	}{
 		{
 			name: "All flags set",
-			args: []string{"test", "-auto", "-prompt", "custom prompt", "-model", "llama2", "-novision", "-maxchars", "65"},
+			args:     []string{"test", "-auto", "-prompt", "custom prompt", "-model", "llama2", "-novision", "-maxchars", "65"},
 			expected: Config{
 				AutoRename:   true,
 				CustomPrompt: "custom prompt",
@@ -110,16 +110,6 @@ func TestFlagParsing(t *testing.T) {
 				FastMode:     true,
 			},
 		},
-		{
-			name: "Custom maxchars updates prompt",
-			args: []string{"test", "-maxchars", "65"},
-			expected: Config{
-				AutoRename:   false,
-				CustomPrompt: fmt.Sprintf(defaultPromptTemplate, 65),
-				Model:        "qwen2.5vl:7b",
-				FastMode:     true,
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -135,21 +125,15 @@ func TestFlagParsing(t *testing.T) {
 			customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "")
 			model := flag.String("model", defaultConfig.Model, "")
 			noVision := flag.Bool("novision", false, "")
-			maxChars := flag.Int("maxchars", defaultMaxChars, "")
+			_ = flag.Int("maxchars", defaultMaxChars, "")
 
 			// Set test args and parse
 			os.Args = tt.args
 			flag.Parse()
 
-			// Build the prompt the same way main() does
-			prompt := *customPrompt
-			if *maxChars != defaultMaxChars && prompt == defaultPrompt {
-				prompt = fmt.Sprintf(defaultPromptTemplate, *maxChars)
-			}
-
 			got := Config{
 				AutoRename:   *autoRename,
-				CustomPrompt: prompt,
+				CustomPrompt: *customPrompt,
 				Model:        *model,
 				FastMode:     !*noVision,
 			}
@@ -158,6 +142,56 @@ func TestFlagParsing(t *testing.T) {
 				t.Errorf("Flag parsing failed:\ngot:  %+v\nwant: %+v", got, tt.expected)
 			}
 		})
+	}
+}
+
+// TestMaxCharsAppendsHintToPrompt verifies that a non-default maxchars value
+// appends a length hint to the prompt
+func TestMaxCharsAppendsHintToPrompt(t *testing.T) {
+	// Save and restore original flag.CommandLine
+	originalFlagCommandLine := flag.CommandLine
+	defer func() { flag.CommandLine = originalFlagCommandLine }()
+
+	flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
+	defaultConfig := getDefaultConfig()
+	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "")
+	_ = flag.Bool("auto", defaultConfig.AutoRename, "")
+	_ = flag.String("model", defaultConfig.Model, "")
+	_ = flag.Bool("novision", false, "")
+	maxChars := flag.Int("maxchars", defaultMaxChars, "")
+
+	os.Args = []string{"test", "-maxchars", "65"}
+	flag.Parse()
+
+	// Replicate the prompt-building from main()
+	prompt := *customPrompt
+	if *maxChars != defaultMaxChars {
+		prompt += fmt.Sprintf(" The filename will be cut off at %d characters.", *maxChars)
+	}
+
+	expectedSuffix := " The filename will be cut off at 65 characters."
+	if !strings.HasSuffix(prompt, expectedSuffix) {
+		t.Errorf("Expected prompt to end with %q, got: %q", expectedSuffix, prompt)
+	}
+
+	// Verify default maxchars does NOT append anything
+	flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
+	customPrompt2 := flag.String("prompt", defaultConfig.CustomPrompt, "")
+	_ = flag.Bool("auto", defaultConfig.AutoRename, "")
+	_ = flag.String("model", defaultConfig.Model, "")
+	_ = flag.Bool("novision", false, "")
+	maxChars2 := flag.Int("maxchars", defaultMaxChars, "")
+
+	os.Args = []string{"test"}
+	flag.Parse()
+
+	prompt2 := *customPrompt2
+	if *maxChars2 != defaultMaxChars {
+		prompt2 += fmt.Sprintf(" The filename will be cut off at %d characters.", *maxChars2)
+	}
+
+	if prompt2 != defaultPrompt {
+		t.Errorf("Expected default prompt unchanged, got: %q", prompt2)
 	}
 }
 

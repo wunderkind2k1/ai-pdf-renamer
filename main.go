@@ -31,7 +31,6 @@ func (e *DefaultExitor) Exit(code int) {
 }
 
 const defaultPrompt = "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
-const defaultPromptTemplate = "Extract the most important keywords from this text and create a filename. The filename should be concise (max %d chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
 const defaultMaxChars = 64
 const winErrPre = "On windows dependencies might be tricky. We recommend using a package manager like chocolatey, winget or similar\n\n"
 
@@ -622,10 +621,10 @@ func main() {
 	// Set the global maxchars limit for filename truncation
 	maxCharsLimit = *maxChars
 
-	// If maxchars differs from default and no custom prompt was provided, update prompt to reflect the limit
+	// If maxchars differs from default, inform the AI about the desired length
 	prompt := *customPrompt
-	if *maxChars != defaultMaxChars && prompt == defaultPrompt {
-		prompt = fmt.Sprintf(defaultPromptTemplate, *maxChars)
+	if *maxChars != defaultMaxChars {
+		prompt += fmt.Sprintf(" The filename will be cut off at %d characters.", *maxChars)
 	}
 
 	// Build config from flags

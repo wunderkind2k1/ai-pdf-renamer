@@ -20,17 +20,17 @@ on:
 jobs:
   release:
     name: Create Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Import GPG Key
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           git_user_signingkey: true
@@ -48,7 +48,7 @@ jobs:
           git push origin ${{ github.event.inputs.version }}
 
       - name: Download Build Artifacts
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v28
         with:
           workflow: build-test.yml
           run_id: ${{ github.event.inputs.workflow_run_id }}
@@ -56,7 +56,7 @@ jobs:
           path: build/
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           name: Release ${{ github.event.inputs.version }}
           tag_name: ${{ github.event.inputs.version }}
@@ -65,5 +65,3 @@ jobs:
           generate_release_notes: ${{ !github.event.inputs.release_notes }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-          retention-days: 5

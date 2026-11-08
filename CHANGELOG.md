@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- OpenAI-compatible chat API client (`/chat/completions`, `/models`) so any OpenAI-style server works
+- Environment configuration: `AI_PDF_RENAMER_API_URL`, `AI_PDF_RENAMER_API_KEY`, `AI_PDF_RENAMER_MODEL` (with `OPENAI_BASE_URL` / `OPENAI_API_KEY` fallbacks)
+- Tests for API base URL resolution, chat completion request/response parsing, and API error handling
 - Added GitHub Actions workflow for automated testing and building
 - Added test coverage reporting with HTML and text output
 - Added automated release workflow with version and release notes input
@@ -49,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test Suite (in main_test.go) now skips (ignores) the usage and dependency tests (TestUsageDisplay_Ignored and TestDependencyChecking) so that the test suite passes (these tests are marked with t.Skip(...) and will be revisited in a fine-grained manner later).
 
 ### Changed
+- Default AI backend is now LM Studio (`http://localhost:1234/v1`) instead of Ollama's native API
+- Default model is now `google/gemma-4-e4b` (was `qwen2.5vl:7b`)
+- Chosen `-model` is kept in vision mode; no longer force-switches to a hardcoded vision model
+- Updated README for LM Studio setup and OpenAI-compatible API configuration (Ollama, OpenAI, llama.cpp, …)
 - Changed test execution to include coverage reporting
 - Updated build process to store artifacts for release pipeline
 - Changed default processing mode to vision-based analysis
@@ -77,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File permission handling
 
 ### Removed
+- Hard dependency on the `ollama` CLI and Ollama-native `/api/generate` / `/api/tags` endpoints (Ollama still works via its OpenAI-compatible `/v1` API)
 - Removed shell script implementation in favor of Go version
 - Removed shell script testing documentation
 - Removed shell script examples from documentation

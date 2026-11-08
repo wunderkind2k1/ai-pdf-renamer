@@ -9,14 +9,14 @@ on:
 jobs:
   test:
     name: Run Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.24'
+          go-version-file: 'go.mod'
 
       - name: Run Tests with Coverage
         run: |
@@ -28,7 +28,7 @@ jobs:
           echo "::endgroup::" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: |
@@ -43,17 +43,17 @@ jobs:
   build:
     name: Build Application
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.24'
+          go-version-file: 'go.mod'
 
       - name: Build with Dagger
-        uses: dagger/dagger-for-github@8.0.0
+        uses: dagger/dagger-for-github@v8.4.1
         with:
           version: "latest"
           verb: run
@@ -61,7 +61,7 @@ jobs:
           args: go run main.go
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-artifacts
           path: build/

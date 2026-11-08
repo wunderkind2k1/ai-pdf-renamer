@@ -3,7 +3,7 @@
 
 # AI PDF Renamer
 
-**AI PDF Renamer** is a powerful tool that automatically renames PDF files based on their content using AI. By leveraging Ollama's AI models, including vision-language capabilities, the tool analyzes PDFs using computer vision by default, with OCR as a fallback option. This helps users keep their file libraries organized without the need to open each file and rename it manually.
+**AI PDF Renamer** is a powerful tool that automatically renames PDF files based on their content using AI. By leveraging local AI models served by [LM Studio](https://lmstudio.ai) (or any OpenAI-compatible API), including vision-language capabilities, the tool analyzes PDFs using computer vision by default, with OCR as a fallback option. This helps users keep their file libraries organized without the need to open each file and rename it manually.
 
 ### 🔍 Why Use It?
 
@@ -25,7 +25,7 @@ https://github.com/user-attachments/assets/71ce7d57-f75c-4660-ba80-56207e14880d
   - **Vision Mode** (default): Uses vision-language AI to analyze PDF pages as images
   - **OCR Mode**: Uses OCR to extract text and analyze it (available via -novision flag)
 - Automatically processes PDF files using glob patterns (e.g., `*.pdf`, `*infographic*.pdf`)
-- Generates concise, descriptive filenames using Ollama's AI models
+- Generates concise, descriptive filenames using local AI models (LM Studio by default, any OpenAI-compatible API via env vars)
 - Interactive renaming with options for single or batch processing
 - Cross-platform support (Linux, macOS, Windows)
 - Automatic fallback to OCR mode if vision processing encounters issues
@@ -36,44 +36,34 @@ https://github.com/user-attachments/assets/71ce7d57-f75c-4660-ba80-56207e14880d
 - `curl`: For making API requests
 - `jq`: For JSON processing
 - `gs` (Ghostscript): For PDF to image conversion
-- `Ollama`: Running locally with one of the following models:
-  - `qwen2.5vl:7b` (default): Vision-language model for image analysis
-  - `gemma3:1b`: Lightweight model for text-based processing
-  - `llama3.3:latest`: More powerful model for text-based processing
+- `LM Studio` (default) with its local server running, or any other OpenAI-compatible API (see [Using another API](#using-another-api-ollama-openai-llamacpp-))
 
 ### Model Selection
 
-The tool supports different Ollama models, each with its own strengths and hardware requirements:
+The default model is `google/gemma-4-e4b`, a small multimodal model used to analyze PDF pages as images.
+Any model your server exposes can be used via `-model` or the `AI_PDF_RENAMER_MODEL` env var — use the model id
+as listed by `lms ls` / `GET /v1/models`. For vision mode (default) the model must support image input
+(e.g. `google/gemma-4-e4b`, `qwen/qwen2.5-vl-7b`); with `-novision` any text model works.
 
-- **qwen2.5vl:7b** (default for fast mode)
-  - Vision-language model capable of understanding images
-  - Used in fast mode for direct image analysis
-  - Provides faster processing by avoiding OCR when possible
-  - Hardware requirements:
-    - Requires significant system resources
-    - Needs a powerful system with ample memory
-    - GPU acceleration recommended
-    - Minimum 16GB RAM recommended
+Note: The default `google/gemma-4-e4b` runs on most modern machines (~8GB RAM). Larger vision models (e.g. `qwen/qwen2.5-vl-7b`) need more resources (16GB+ RAM, GPU recommended).
 
-- **gemma3:1b** (default for OCR mode)
-  - Lightweight and fast
-  - Good for general purpose text analysis
-  - Used as fallback when fast mode fails
-  - Hardware requirements:
-    - Minimal resource usage
-    - Works well on most modern systems
-    - Suitable for systems with limited resources
+### Using another API (Ollama, OpenAI, llama.cpp, …)
 
-- **llama3.3:latest** (alternative for OCR mode)
-  - More powerful and context-aware
-  - Better for subject-specific content
-  - Recommended for academic papers, technical documents
-  - Hardware requirements:
-    - Requires significant system resources
-    - Needs a powerful system with ample memory
-    - May not be suitable for all environments
+The tool talks to the OpenAI-style `/models` and `/chat/completions` endpoints. Configure it via environment variables:
 
-Note: Resource usage varies depending on your system configuration, model quantization, and workload. If you're unsure about your system's capabilities, start with fast mode using qwen2.5vl:7b.
+| Variable | Default | Description |
+|---|---|---|
+| `AI_PDF_RENAMER_API_URL` | `http://localhost:1234/v1` | Base URL of the API (falls back to `OPENAI_BASE_URL`) |
+| `AI_PDF_RENAMER_API_KEY` | _(none)_ | Sent as `Authorization: Bearer …` (falls back to `OPENAI_API_KEY`) |
+| `AI_PDF_RENAMER_MODEL` | `google/gemma-4-e4b` | Default model (the `-model` flag takes precedence) |
+
+```bash
+# Ollama (via its OpenAI-compatible endpoint)
+AI_PDF_RENAMER_API_URL=http://localhost:11434/v1 AI_PDF_RENAMER_MODEL=qwen2.5vl:7b ./ai-pdf-renamer '*.pdf'
+
+# OpenAI
+AI_PDF_RENAMER_API_URL=https://api.openai.com/v1 AI_PDF_RENAMER_API_KEY=sk-... AI_PDF_RENAMER_MODEL=gpt-4o-mini ./ai-pdf-renamer '*.pdf'
+```
 
 ## How to get it
 
@@ -86,21 +76,16 @@ Download the app from the current release at https://github.com/wunderkind2k1/ai
    ```bash
    # macOS
    brew install ocrmypdf curl jq ghostscript
-   brew install ollama
 
    # Linux (Ubuntu/Debian)
    sudo apt-get install ocrmypdf curl jq ghostscript
-   curl -fsSL https://ollama.com/install.sh | sh
    ```
+   Install LM Studio from https://lmstudio.ai
 
-3. Download and set up the required Ollama models:
+3. Download the model and start the LM Studio server:
    ```bash
-   # Start Ollama service
-   ollama serve
-
-   # In a new terminal, pull the required models
-   ollama pull qwen2.5vl:7b  # For fast mode
-   ollama pull gemma3:1b     # For OCR mode fallback
+   lms get google/gemma-4-e4b
+   lms server start
    ```
 
 4. Build the tool:
@@ -128,7 +113,7 @@ Before using the tool with automatic renaming (`-auto` option), it's crucial to:
 - `-h, --help`: Show help message
 - `-auto`: Automatically rename all files without confirmation (use with caution!)
 - `-prompt`: Use a custom prompt for filename generation
-- `-model`: Specify the Ollama model to use (default: qwen2.5vl:7b)
+- `-model`: Specify the model to use (default: google/gemma-4-e4b, or `AI_PDF_RENAMER_MODEL`)
 - `-novision`: Disable vision-based processing and use OCR only
 - `-output`: Specify output directory for renamed files
 - `-maxchars`: Maximum character length for generated filenames (default: 64)
@@ -178,7 +163,7 @@ Before using the tool with automatic renaming (`-auto` option), it's crucial to:
 ### Processing Modes
 
 #### Vision Mode (Default)
-Vision mode uses the qwen2.5vl:7b vision-language model to analyze PDF pages directly as images. This mode:
+Vision mode uses a vision-language model (default: google/gemma-4-e4b) to analyze PDF pages directly as images. This mode:
 - Converts PDF pages to images using Ghostscript
 - Analyzes up to 3 pages per document
 - Uses vision-language AI to understand content
@@ -217,12 +202,12 @@ You can override this using the `-prompt` option.
 
 ## Notes
 
-- The tool requires Ollama to be running locally on port 11434
+- By default the tool expects the LM Studio server on `http://localhost:1234/v1` (override with `AI_PDF_RENAMER_API_URL`)
 - Generated filenames are limited to 64 characters by default (configurable via `-maxchars`)
 - Only alphanumeric characters and dashes are allowed in generated filenames
 - The tool will skip non-PDF files and non-existent files
-- Fast mode requires the qwen2.5vl:7b model to be installed
-- OCR mode is available as a fallback if fast mode fails
+- Vision mode requires a model with image input support
+- OCR mode is available as a fallback if vision mode fails
 
 ## Test Suite
 

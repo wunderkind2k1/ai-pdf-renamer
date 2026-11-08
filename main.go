@@ -30,6 +30,17 @@ func (e *DefaultExitor) Exit(code int) {
 	os.Exit(code)
 }
 
+// Defaults target LM Studio's OpenAI-compatible server; override via env vars
+// to use any other OpenAI-style endpoint (Ollama's /v1, llama.cpp, vLLM, OpenAI, ...).
+const (
+	defaultAPIBaseURL = "http://localhost:1234/v1"
+	defaultModel      = "google/gemma-4-e4b"
+
+	envAPIBaseURL = "AI_PDF_RENAMER_API_URL"
+	envAPIKey     = "AI_PDF_RENAMER_API_KEY"
+	envModel      = "AI_PDF_RENAMER_MODEL"
+)
+
 const defaultPrompt = "Extract the most important keywords from this text and create a filename. The filename should be concise (max 64 chars), use only the most important keywords, and separate words with dashes. Do not include any explanations or additional text."
 const defaultMaxChars = 64
 const winErrPre = "On windows dependencies might be tricky. We recommend using a package manager like chocolatey, winget or similar\n\n"
@@ -50,15 +61,141 @@ var config Config
 // maxCharsLimit controls the truncation length for generated filenames
 var maxCharsLimit = defaultMaxChars
 
-// OllamaResponse represents the response from Ollama API
-type OllamaResponse struct {
-	Response string `json:"response"`
-	Error    string `json:"error,omitempty"`
+// chatCompletionResponse represents the response from an OpenAI-style /chat/completions endpoint
+type chatCompletionResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+	// Error is an object ({"message": ...}) for OpenAI/LM Studio, but some servers return a plain string
+	Error json.RawMessage `json:"error,omitempty"`
+}
+
+// envOr returns the first non-empty environment variable from keys, or fallback
+func envOr(fallback string, keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return fallback
+}
+
+// apiBaseURL returns the OpenAI-style base URL (e.g. http://localhost:1234/v1) without trailing slash
+func apiBaseURL() string {
+	return strings.TrimRight(envOr(defaultAPIBaseURL, envAPIBaseURL, "OPENAI_BASE_URL"), "/")
+}
+
+// newAPIRequest builds a request against the configured API, adding auth if a key is set
+func newAPIRequest(method, path string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, apiBaseURL()+path, body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if key := envOr("", envAPIKey, "OPENAI_API_KEY"); key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
+	return req, nil
+}
+
+// apiErrorMessage extracts a readable message from an OpenAI-style error field
+func apiErrorMessage(raw json.RawMessage) string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	var obj struct {
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(raw, &obj) == nil && obj.Message != "" {
+		return obj.Message
+	}
+	return string(raw)
+}
+
+// chatCompletion sends a single user message (text plus optional base64 PNG images) and returns the reply
+func chatCompletion(prompt string, base64Images []string) (string, error) {
+	var content interface{} = prompt
+	if len(base64Images) > 0 {
+		parts := []map[string]interface{}{{"type": "text", "text": prompt}}
+		for _, img := range base64Images {
+			parts = append(parts, map[string]interface{}{
+				"type":      "image_url",
+				"image_url": map[string]string{"url": "data:image/png;base64," + img},
+			})
+		}
+		content = parts
+	}
+
+	payload := map[string]interface{}{
+		"model":    config.Model,
+		"messages": []map[string]interface{}{{"role": "user", "content": content}},
+		"stream":   false,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("error creating JSON payload: %v", err)
+	}
+
+	req, err := newAPIRequest(http.MethodPost, "/chat/completions", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("error creating request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error calling API at %s: %v", apiBaseURL(), err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response: %v", err)
+	}
+
+	var chatResp chatCompletionResponse
+	if err := json.Unmarshal(body, &chatResp); err != nil {
+		return "", fmt.Errorf("error parsing response (HTTP %d): %v", resp.StatusCode, err)
+	}
+
+	if msg := apiErrorMessage(chatResp.Error); msg != "" {
+		return "", fmt.Errorf("error from API: %s\nPlease ensure that the %s model is available (e.g. in LM Studio: lms get %s)", msg, config.Model, config.Model)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("error from API: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
+	if len(chatResp.Choices) == 0 || chatResp.Choices[0].Message.Content == "" {
+		return "", fmt.Errorf("error: Empty response from API\nPlease ensure that the %s model is available and working correctly", config.Model)
+	}
+
+	return chatResp.Choices[0].Message.Content, nil
+}
+
+// cleanFilename converts a model reply into a safe, length-limited filename
+func cleanFilename(response string) string {
+	cleanName := regexp.MustCompile(`[^a-zA-Z0-9-]`).ReplaceAllString(response, "-")
+	cleanName = regexp.MustCompile(`-+`).ReplaceAllString(cleanName, "-")
+	cleanName = strings.Trim(cleanName, "-")
+
+	// Ensure the name is not too long
+	if len(cleanName) > maxCharsLimit {
+		cleanName = cleanName[:maxCharsLimit]
+	}
+
+	return cleanName
 }
 
 // checkDependencies verifies that all required tools are installed
 func checkDependencies() error {
-	deps := []string{"curl", "jq", "ollama", "gs", "ocrmypdf"} // Always include ocrmypdf
+	deps := []string{"curl", "jq", "gs", "ocrmypdf"} // Always include ocrmypdf
 	for _, dep := range deps {
 		if runtime.GOOS == "windows" {
 			// On Windows, append .exe if necessary
@@ -74,47 +211,43 @@ func checkDependencies() error {
 		}
 	}
 
-	// Check if Ollama service is running
-	resp, err := http.Get("http://localhost:11434/api/version")
+	// Check if the API server is reachable and the specified model is available
+	req, err := newAPIRequest(http.MethodGet, "/models", nil)
 	if err != nil {
-		return fmt.Errorf("error: Ollama service is not running. Please start it with 'ollama serve'")
+		return fmt.Errorf("error creating request: %v", err)
 	}
-	defer resp.Body.Close()
-
-	// Check if the specified model is available
-	resp, err = http.Get("http://localhost:11434/api/tags")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error checking Ollama models: %v", err)
+		return fmt.Errorf("error: API server at %s is not reachable.\nStart the LM Studio server (lms server start) or set %s to an OpenAI-compatible endpoint", apiBaseURL(), envAPIBaseURL)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error reading Ollama models response: %v", err)
+		return fmt.Errorf("error reading models response: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("error listing models at %s: HTTP %d: %s", apiBaseURL(), resp.StatusCode, string(body))
 	}
 
 	var models struct {
-		Models []struct {
-			Name string `json:"name"`
-		} `json:"models"`
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &models); err != nil {
-		return fmt.Errorf("error parsing Ollama models response: %v", err)
+		return fmt.Errorf("error parsing models response: %v", err)
 	}
 
-	modelFound := false
-	for _, model := range models.Models {
-		if model.Name == config.Model {
-			modelFound = true
-			break
+	var available []string
+	for _, model := range models.Data {
+		if model.ID == config.Model {
+			return nil
 		}
+		available = append(available, model.ID)
 	}
 
-	if !modelFound {
-		return fmt.Errorf("error: %s model is not installed in Ollama.\nPlease install it by running: ollama pull %s", config.Model, config.Model)
-	}
-
-	return nil
+	return fmt.Errorf("error: %s model is not available at %s.\nIn LM Studio, download it with: lms get %s\nor pick one via -model or %s. Available models: %s", config.Model, apiBaseURL(), config.Model, envModel, strings.Join(available, ", "))
 }
 
 // extractText extracts text from a PDF using ocrmypdf
@@ -229,59 +362,16 @@ func extractPDFPages(pdfFile string) ([][]byte, error) {
 	return images, nil
 }
 
-// generateFilename generates a filename using Ollama API
+// generateFilename generates a filename using the OpenAI-compatible chat API
 func generateFilename(text string, prompt string) (string, error) {
-	// Create the JSON payload
-	payload := map[string]interface{}{
-		"model":  config.Model,
-		"prompt": prompt,
-		"stream": false,
-	}
-
-	jsonData, err := json.Marshal(payload)
+	response, err := chatCompletion(prompt, nil)
 	if err != nil {
-		return "", fmt.Errorf("error creating JSON payload: %v", err)
+		return "", err
 	}
-
-	// Call Ollama API
-	resp, err := http.Post("http://localhost:11434/api/generate", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("error calling Ollama API: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response: %v", err)
-	}
-
-	var ollamaResp OllamaResponse
-	if err := json.Unmarshal(body, &ollamaResp); err != nil {
-		return "", fmt.Errorf("error parsing response: %v", err)
-	}
-
-	if ollamaResp.Error != "" {
-		return "", fmt.Errorf("error from Ollama API: %s\nPlease ensure that the %s model is installed by running:\n  ollama pull %s", ollamaResp.Error, config.Model, config.Model)
-	}
-
-	if ollamaResp.Response == "" {
-		return "", fmt.Errorf("error: Empty response from Ollama API\nPlease ensure that the %s model is installed and working correctly:\n  1. Check if the model is installed: ollama list\n  2. If not installed, run: ollama pull %s\n  3. If installed but not working, try: ollama rm %s && ollama pull %s", config.Model, config.Model, config.Model, config.Model)
-	}
-
-	// Clean up the response
-	cleanName := regexp.MustCompile(`[^a-zA-Z0-9-]`).ReplaceAllString(ollamaResp.Response, "-")
-	cleanName = regexp.MustCompile(`-+`).ReplaceAllString(cleanName, "-")
-	cleanName = strings.Trim(cleanName, "-")
-
-	// Ensure the name is not too long
-	if len(cleanName) > maxCharsLimit {
-		cleanName = cleanName[:maxCharsLimit]
-	}
-
-	return cleanName, nil
+	return cleanFilename(response), nil
 }
 
-// generateFilenameFast generates a filename using Ollama API with multiple image inputs
+// generateFilenameFast generates a filename using the OpenAI-compatible chat API with multiple image inputs
 func generateFilenameFast(images [][]byte, prompt string) (string, error) {
 	fmt.Printf("Using model: %s for image-based processing\n", config.Model)
 	fmt.Printf("Extracted %d page(s) from PDF, sending all for analysis\n", len(images))
@@ -301,51 +391,11 @@ func generateFilenameFast(images [][]byte, prompt string) (string, error) {
 		base64Images = append(base64Images, base64.StdEncoding.EncodeToString(imgData))
 	}
 
-	// Create the JSON payload with all images
-	payload := map[string]interface{}{
-		"model":  config.Model,
-		"prompt": prompt,
-		"stream": false,
-		"images": base64Images,
-	}
-
-	jsonData, err := json.Marshal(payload)
+	response, err := chatCompletion(prompt, base64Images)
 	if err != nil {
-		return "", fmt.Errorf("error creating JSON payload: %v", err)
+		return "", err
 	}
-
-	// Call Ollama API
-	resp, err := http.Post("http://localhost:11434/api/generate", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("error calling Ollama API: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response: %v", err)
-	}
-
-	var ollamaResp OllamaResponse
-	if err := json.Unmarshal(body, &ollamaResp); err != nil {
-		return "", fmt.Errorf("error parsing response: %v", err)
-	}
-
-	if ollamaResp.Error != "" {
-		return "", fmt.Errorf("error from Ollama API: %s", ollamaResp.Error)
-	}
-
-	// Clean up the response
-	cleanName := regexp.MustCompile(`[^a-zA-Z0-9-]`).ReplaceAllString(ollamaResp.Response, "-")
-	cleanName = regexp.MustCompile(`-+`).ReplaceAllString(cleanName, "-")
-	cleanName = strings.Trim(cleanName, "-")
-
-	// Ensure the name is not too long
-	if len(cleanName) > maxCharsLimit {
-		cleanName = cleanName[:maxCharsLimit]
-	}
-
-	return cleanName, nil
+	return cleanFilename(response), nil
 }
 
 // getDefaultConfig returns the default configuration
@@ -353,10 +403,10 @@ func getDefaultConfig() Config {
 	return Config{
 		AutoRename:   false,
 		CustomPrompt: defaultPrompt,
-		Model:        "qwen2.5vl:7b",   // Default to vision model
-		FastMode:     true,             // Default to vision mode
-		OutputDir:    "",               // Empty string means use the same directory as input
-		Exitor:       &DefaultExitor{}, // Default exitor implementation
+		Model:        envOr(defaultModel, envModel), // Default to vision model
+		FastMode:     true,                          // Default to vision mode
+		OutputDir:    "",                            // Empty string means use the same directory as input
+		Exitor:       &DefaultExitor{},              // Default exitor implementation
 	}
 }
 
@@ -536,12 +586,6 @@ func setup(cfg Config) {
 		cfg.OutputDir = outputDirPath
 	}
 
-	// If vision mode is enabled (default), ensure we're using the vision model
-	if cfg.FastMode && cfg.Model != "qwen2.5vl:7b" {
-		fmt.Printf("Note: Switching to qwen2.5vl:7b model for vision-based processing\n")
-		cfg.Model = "qwen2.5vl:7b"
-	}
-
 	// Set global config for downstream functions
 	config = cfg
 
@@ -597,7 +641,7 @@ func main() {
 	defaultConfig := getDefaultConfig()
 	autoRename := flag.Bool("auto", defaultConfig.AutoRename, "Automatically rename all files without confirmation")
 	customPrompt := flag.String("prompt", defaultConfig.CustomPrompt, "Custom prompt for filename generation")
-	model := flag.String("model", defaultConfig.Model, "Ollama model to use for filename generation")
+	model := flag.String("model", defaultConfig.Model, "Model to use for filename generation (env: "+envModel+")")
 	noVision := flag.Bool("novision", false, "Disable vision-based processing and use OCR only")
 	outputDir := flag.String("output", "", "Output directory for renamed files (default: same as input)")
 	maxChars := flag.Int("maxchars", defaultMaxChars, "Maximum character length for generated filenames")
@@ -611,8 +655,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  %s -output renamed/ *.pdf     # Use vision-based processing (default)\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -novision *.pdf            # Use OCR-only mode\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -auto *.pdf                # Process all PDFs automatically\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -model llama3.3:latest *.pdf # Use a different model\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -model qwen/qwen2.5-vl-7b *.pdf # Use a different model\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -maxchars 64 *.pdf           # Limit filenames to 64 characters\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nEnvironment:\n")
+		fmt.Fprintf(os.Stderr, "  %s  OpenAI-compatible base URL (default: %s, fallback: OPENAI_BASE_URL)\n", envAPIBaseURL, defaultAPIBaseURL)
+		fmt.Fprintf(os.Stderr, "  %s  API key sent as Bearer token (optional, fallback: OPENAI_API_KEY)\n", envAPIKey)
+		fmt.Fprintf(os.Stderr, "  %s    Default model (default: %s)\n", envModel, defaultModel)
 		fmt.Fprintf(os.Stderr, "\nNote: Vision-based processing is enabled by default. Use -novision to disable it and use OCR only.\n")
 	}
 

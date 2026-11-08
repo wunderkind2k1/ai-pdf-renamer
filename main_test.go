@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,10 +51,10 @@ func TestDefaultConfig(t *testing.T) {
 		{
 			name: "Model default",
 			check: func(c Config) bool {
-				return c.Model == "qwen2.5vl:7b"
+				return c.Model == defaultModel
 			},
 			expected: true,
-			message:  "Default Model should be qwen2.5vl:7b",
+			message:  "Default Model should be " + defaultModel,
 		},
 		{
 			name: "FastMode default",
@@ -96,7 +99,7 @@ func TestFlagParsing(t *testing.T) {
 			expected: Config{
 				AutoRename:   false,
 				CustomPrompt: defaultPrompt,
-				Model:        "qwen2.5vl:7b",
+				Model:        defaultModel,
 				FastMode:     true,
 			},
 		},
@@ -106,7 +109,7 @@ func TestFlagParsing(t *testing.T) {
 			expected: Config{
 				AutoRename:   true,
 				CustomPrompt: defaultPrompt,
-				Model:        "qwen2.5vl:7b",
+				Model:        defaultModel,
 				FastMode:     true,
 			},
 		},
@@ -303,27 +306,12 @@ func TestDependencyChecking(t *testing.T) {
 			},
 		},
 		{
-			name:        "Missing ollama",
-			dependency:  "ollama",
-			expectedMsg: "ollama is not installed",
-			setupTestDir: func(tmpDir string) func() {
-				// Create mock executables for required dependencies
-				for _, dep := range []string{"curl", "ocrmypdf", "jq"} {
-					depPath := filepath.Join(tmpDir, dep)
-					os.WriteFile(depPath, []byte("#!/bin/sh\necho 'mock "+dep+"'"), 0755)
-				}
-				originalPath := os.Getenv("PATH")
-				os.Setenv("PATH", tmpDir)
-				return func() { os.Setenv("PATH", originalPath) }
-			},
-		},
-		{
 			name:        "Missing gs",
 			dependency:  "gs",
 			expectedMsg: "gs is not installed",
 			setupTestDir: func(tmpDir string) func() {
 				// Create mock executables for required dependencies
-				for _, dep := range []string{"curl", "ocrmypdf", "jq", "ollama"} {
+				for _, dep := range []string{"curl", "ocrmypdf", "jq"} {
 					depPath := filepath.Join(tmpDir, dep)
 					os.WriteFile(depPath, []byte("#!/bin/sh\necho 'mock "+dep+"'"), 0755)
 				}
@@ -364,7 +352,7 @@ func TestDependencyChecking(t *testing.T) {
 	}
 }
 
-// TestModelSwitching verifies that model selection works correctly based on vision mode
+// TestModelSwitching verifies that the chosen model is kept regardless of vision mode
 func TestModelSwitching(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -376,7 +364,7 @@ func TestModelSwitching(t *testing.T) {
 			name:          "Vision mode with llama2",
 			initialModel:  "llama2",
 			useVision:     true,
-			expectedModel: "qwen2.5vl:7b",
+			expectedModel: "llama2",
 		},
 		{
 			name:          "No vision mode with llama2",
@@ -386,15 +374,15 @@ func TestModelSwitching(t *testing.T) {
 		},
 		{
 			name:          "Vision mode with default model",
-			initialModel:  "qwen2.5vl:7b",
+			initialModel:  defaultModel,
 			useVision:     true,
-			expectedModel: "qwen2.5vl:7b",
+			expectedModel: defaultModel,
 		},
 		{
 			name:          "No vision mode with default model",
-			initialModel:  "qwen2.5vl:7b",
+			initialModel:  defaultModel,
 			useVision:     false,
-			expectedModel: "qwen2.5vl:7b",
+			expectedModel: defaultModel,
 		},
 	}
 
@@ -432,5 +420,85 @@ func TestModelSwitching(t *testing.T) {
 				t.Errorf("Model = %q, want %q", config.Model, tt.expectedModel)
 			}
 		})
+	}
+}
+
+// TestAPIBaseURLFromEnv verifies the base URL default and env overrides
+func TestAPIBaseURLFromEnv(t *testing.T) {
+	t.Setenv(envAPIBaseURL, "")
+	t.Setenv("OPENAI_BASE_URL", "")
+	if got := apiBaseURL(); got != defaultAPIBaseURL {
+		t.Errorf("apiBaseURL() = %q, want %q", got, defaultAPIBaseURL)
+	}
+
+	t.Setenv("OPENAI_BASE_URL", "http://openai.example/v1/")
+	if got := apiBaseURL(); got != "http://openai.example/v1" {
+		t.Errorf("apiBaseURL() = %q, want OPENAI_BASE_URL fallback without trailing slash", got)
+	}
+
+	t.Setenv(envAPIBaseURL, "http://localhost:11434/v1")
+	if got := apiBaseURL(); got != "http://localhost:11434/v1" {
+		t.Errorf("apiBaseURL() = %q, want %s to take precedence", got, envAPIBaseURL)
+	}
+}
+
+// TestChatCompletion verifies the OpenAI-style request format and response parsing
+func TestChatCompletion(t *testing.T) {
+	var gotAuth string
+	var gotBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		gotAuth = r.Header.Get("Authorization")
+		json.NewDecoder(r.Body).Decode(&gotBody)
+		fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":"Invoice ACME 2024!"}}]}`)
+	}))
+	defer server.Close()
+
+	t.Setenv(envAPIBaseURL, server.URL+"/v1")
+	t.Setenv(envAPIKey, "secret")
+	config = Config{Model: "test-model"}
+	maxCharsLimit = defaultMaxChars
+
+	name, err := generateFilenameFast([][]byte{[]byte("img")}, "prompt")
+	if err != nil {
+		t.Fatalf("generateFilenameFast() error = %v", err)
+	}
+	if name != "Invoice-ACME-2024" {
+		t.Errorf("name = %q, want %q", name, "Invoice-ACME-2024")
+	}
+	if gotAuth != "Bearer secret" {
+		t.Errorf("Authorization = %q, want %q", gotAuth, "Bearer secret")
+	}
+	if gotBody["model"] != "test-model" {
+		t.Errorf("model = %v, want test-model", gotBody["model"])
+	}
+	content := gotBody["messages"].([]interface{})[0].(map[string]interface{})["content"].([]interface{})
+	if len(content) != 2 {
+		t.Fatalf("content parts = %d, want 2 (text + image)", len(content))
+	}
+	imageURL := content[1].(map[string]interface{})["image_url"].(map[string]interface{})["url"].(string)
+	if !strings.HasPrefix(imageURL, "data:image/png;base64,") {
+		t.Errorf("image url = %q, want data URL", imageURL)
+	}
+}
+
+// TestChatCompletionError verifies that API errors (object or string form) are surfaced
+func TestChatCompletionError(t *testing.T) {
+	for _, body := range []string{`{"error":{"message":"model not found"}}`, `{"error":"model not found"}`} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, body)
+		}))
+		t.Setenv(envAPIBaseURL, server.URL)
+		config = Config{Model: "missing"}
+
+		_, err := generateFilename("text", "prompt")
+		server.Close()
+		if err == nil || !strings.Contains(err.Error(), "model not found") {
+			t.Errorf("body %s: error = %v, want containing %q", body, err, "model not found")
+		}
 	}
 }
